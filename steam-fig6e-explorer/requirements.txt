@@ -1,0 +1,11 @@
+# Built and tested against Python 3.12 with the versions noted below.
+# Major versions are capped: pandas 3.x and numpy 3.x are not yet verified here,
+# and an unattended `pip install` on a recipient's machine will otherwise pull
+# whatever is newest.
+streamlit>=1.48,<2        # tested 1.58
+numpy>=1.24,<3            # tested 2.5
+pandas>=2.0,<3            # tested 2.2
+matplotlib>=3.7,<4        # tested 3.10
+requests>=2.28,<3         # tested 2.32
+pyBigWig>=0.3.22,<0.4     # tested 0.3.24
+biopython>=1.81,<2        # tested 1.87
