@@ -9,3 +9,5 @@ data/*.log
 .DS_Store
 .build_cache
 data/genes/
+
+*.zip
