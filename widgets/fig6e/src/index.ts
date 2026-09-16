@@ -131,6 +131,24 @@ export function render({ model, el }: { model: AnyModel; el: HTMLElement }): () 
   );
   winSel.value = String(get("window_kb"));
 
+  /** A data-loading failure, with the store URL and what to check. */
+  const errorBox = (s: Status) => {
+    const d = s.errorDetail;
+    const hints: Record<string, string> = {
+      cors: "Fix: add a CORS policy to the bucket allowing GET and HEAD from any origin, then reload. Or point data_url at a store that already sends CORS headers (e.g. the widget dev server).",
+      network: "Fix: start the data server (bun run dev in widgets/fig6e serves ../../data at /data), or set data_url to the public bucket.",
+      http: "Fix: check that data_url is the folder containing steam_v1_gps.zarr/, tree.nwk, gene_tss.json and genes/, and that the objects are public.",
+      format: "Fix: data_url should point at the folder written by build_zarr.py + export_sidecars.py.",
+      unknown: "",
+    };
+    return h("div", { class: "f6e-errbox" },
+      h("div", { class: "f6e-errtitle" }, "Couldn't load the data store"),
+      h("div", {}, s.error ?? ""),
+      d ? h("div", { class: "f6e-errmeta" }, "data_url: ", h("code", {}, d.base)) : "",
+      d && hints[d.kind] ? h("div", { class: "f6e-errhint" }, hints[d.kind]) : "",
+    );
+  };
+
   const tile = (value: string | number, label: string, sub: string) =>
     h("div", { class: "f6e-tile" }, h("div", { class: "f6e-tv" }, String(value)), h("div", { class: "f6e-tl" }, label), h("div", { class: "f6e-ts" }, sub));
 
@@ -145,8 +163,9 @@ export function render({ model, el }: { model: AnyModel; el: HTMLElement }): () 
       ctSel.value = get("cell_type");
     },
     onStatus: (s: Status) => {
-      msg.textContent = s.loading ? "loading…" : s.error ? `error: ${s.error}` : "";
       msg.className = s.error ? "f6e-msg f6e-err" : "f6e-msg";
+      if (s.error) msg.replaceChildren(errorBox(s));
+      else msg.textContent = s.loading ? "loading…" : "";
       if (s.species === undefined) return;
       updateUcsc();
       status.replaceChildren(

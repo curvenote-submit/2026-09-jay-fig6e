@@ -15,6 +15,36 @@ type GeneTss = Record<string, [string, number, string]>;
 
 const LRU_CHUNKS = 48; // × ~500 KB decoded = ~24 MB
 
+/** A data-loading failure with enough context for a useful message. */
+export class DataError extends Error {
+  constructor(readonly kind: "cors" | "http" | "network" | "format", readonly url: string, readonly status: number | null, message: string) {
+    super(message);
+    this.name = "DataError";
+  }
+}
+
+/**
+ * fetch() with diagnosis. A bare TypeError from fetch on a cross-origin URL is
+ * almost always CORS (the browser hides the real status); same-origin it is a
+ * network / server problem.
+ */
+async function fetchOrExplain(url: string, init?: RequestInit): Promise<Response> {
+  let r: Response;
+  try {
+    r = await fetch(url, init);
+  } catch (e) {
+    const crossOrigin = (() => { try { return new URL(url).origin !== location.origin; } catch { return false; } })();
+    if (crossOrigin) throw new DataError("cors", url, null,
+      `The browser refused to read the data store at ${new URL(url).origin}. Most likely the bucket has no CORS policy (it must send Access-Control-Allow-Origin for GET/HEAD).`);
+    throw new DataError("network", url, null, `Could not reach the data store (${(e as Error).message}). Is the data server running?`);
+  }
+  if (!r.ok) {
+    const what = r.status === 404 ? "not found" : r.status === 403 ? "forbidden (is the object public?)" : `HTTP ${r.status}`;
+    throw new DataError("http", url, r.status, `${url.replace(/^.*\/(steam_v1_gps\.zarr|tree\.nwk|gene_tss\.json|genes)/, "$1")}: ${what}.`);
+  }
+  return r;
+}
+
 export class DataSource {
   base: string;
   private _meta: StoreMeta | null;
@@ -39,21 +69,24 @@ export class DataSource {
 
   async meta(): Promise<StoreMeta> {
     if (!this._meta) {
-      const r = await fetch(`${this.base}/steam_v1_gps.zarr/meta.json`);
-      if (!r.ok) throw new Error(`meta.json: ${r.status}`);
-      this._meta = (await r.json()) as StoreMeta;
+      const url = `${this.base}/steam_v1_gps.zarr/meta.json`;
+      const r = await fetchOrExplain(url);
+      let m: StoreMeta;
+      try { m = (await r.json()) as StoreMeta; } catch { throw new DataError("format", url, r.status, "meta.json is not valid JSON — is data_url pointing at the folder that contains steam_v1_gps.zarr/?"); }
+      if (!m.chrom_offsets || !m.species) throw new DataError("format", url, r.status, "meta.json is missing chrom_offsets / species — not a STEAM GPS store.");
+      this._meta = m;
     }
     return this._meta;
   }
 
   async tree(): Promise<string> {
-    if (!this._tree) this._tree = await (await fetch(`${this.base}/tree.nwk`)).text();
+    if (!this._tree) this._tree = await (await fetchOrExplain(`${this.base}/tree.nwk`)).text();
     return this._tree;
   }
 
   /** {SYMBOL: [chrom, tss, strand]} — ~900 KB, loaded on first gene lookup. */
   async geneTss(): Promise<GeneTss> {
-    if (!this._tss) this._tss = (await (await fetch(`${this.base}/gene_tss.json`)).json()) as GeneTss;
+    if (!this._tss) this._tss = (await (await fetchOrExplain(`${this.base}/gene_tss.json`)).json()) as GeneTss;
     return this._tss;
   }
 

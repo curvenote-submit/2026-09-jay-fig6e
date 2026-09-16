@@ -198,10 +198,10 @@ What the spikes taught us (details in `spikes/myst-anywidget/README.md`):
       analysis window and is synced to the model. Span clamped to 2 kb – 4 Mb until the
       phase-3 pyramid.
 - [ ] SVG / PNG / TSV export, UCSC link.
-- [~] Store on S3: `https://cn-scms-datastore.s3.us-east-1.amazonaws.com/csev-steam-1/data/`
-      (chr4 × Hepatocytes uploaded 2026-09-16; layout verified). **Bucket still needs a CORS
-      policy** allowing GET/HEAD from `*` — browsers refuse it until then. The widget's
-      default `data_url` is this bucket; the directive body or `globalThis.F6E_DATA_URL` override it.
+- [x] Store on S3: `https://cn-scms-datastore.s3.us-east-1.amazonaws.com/csev-steam-1/data/`
+      (chr4 × Hepatocytes, CORS enabled 2026-09-16; the MyST page loads from it directly,
+      ~180 ms per chunk from us-east-1). The widget's default `data_url` is this bucket; the
+      directive body or `globalThis.F6E_DATA_URL` override it.
 - This is the version to show Jay.
 
 ### Phase 2 — whole genome, one cell class (≈1 day near the data, or ~14 h/cell class from a laptop)

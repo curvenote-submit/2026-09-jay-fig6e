@@ -4,7 +4,7 @@
 // the controls and status tiles around it and talks to it through setParams()
 // and two callbacks; the shell never needs to know about pan ticks.
 
-import { DataSource } from "./data";
+import { DataSource, DataError } from "./data";
 import { buildTree } from "./tree";
 import { callEnhancers, assignSyntenyGroups, coverage, columnTracks } from "./compute";
 import { drawFigure, fmtBp, type FigureHandle } from "./draw";
@@ -109,8 +109,14 @@ export class Controller {
       await this.setView(view ?? this.anchorView());
     } catch (e) {
       console.error(e);
-      this.cb.onStatus({ loading: false, error: (e as Error).message });
+      this.cb.onStatus(this.errorStatus(e));
     }
+  }
+
+  private errorStatus(e: unknown): Status {
+    const msg = e instanceof Error ? e.message : String(e);
+    const detail = e instanceof DataError ? { kind: e.kind, url: e.url, base: this.ds.base } : { kind: "unknown", url: "", base: this.ds.base };
+    return { loading: false, error: msg, errorDetail: detail };
   }
 
   clampView(v: View): View {
@@ -136,7 +142,7 @@ export class Controller {
       this.redraw();
     } catch (e) {
       console.error(e);
-      this.cb.onStatus({ loading: false, error: (e as Error).message });
+      this.cb.onStatus(this.errorStatus(e));
     }
   }
 

@@ -65,3 +65,8 @@
 .f6e-kv-v b { color: #fff; }
 .f6e-groupdot { cursor: pointer; }
 .f6e-sptitle { pointer-events: auto; cursor: help; text-decoration: underline dotted; }
+.f6e-errbox { border: 1px solid #fecaca; background: #fef2f2; color: #7f1d1d; padding: 8px 10px; margin: 6px 0; font-size: 12px; line-height: 1.45; }
+.f6e-errtitle { font-weight: 600; margin-bottom: 2px; }
+.f6e-errmeta { margin-top: 4px; color: #991b1b; }
+.f6e-errmeta code { font-size: 11px; background: #fee2e2; padding: 0 4px; word-break: break-all; }
+.f6e-errhint { margin-top: 4px; color: #7f1d1d; }

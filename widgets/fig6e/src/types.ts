@@ -81,6 +81,8 @@ export interface Params {
 export interface Status {
   loading: boolean;
   error: string | null;
+  /** extra context for a data-loading failure */
+  errorDetail?: { kind: string; url: string; base: string } | null;
   species?: number;
   totalSpecies?: number;
   enhancers?: number;
