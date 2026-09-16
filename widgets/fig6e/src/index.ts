@@ -23,8 +23,12 @@ interface ModelKeys {
   row_px: number | null;
   start: number | null; end: number | null;
 }
+/** Public store. Override per instance with the `data_url` model key (the
+ *  `{anywidget}` directive body in MyST), or page-wide with `globalThis.F6E_DATA_URL`. */
+export const DEFAULT_DATA_URL = "https://cn-scms-datastore.s3.us-east-1.amazonaws.com/csev-steam-1/data";
+
 const DEFAULTS: ModelKeys = {
-  data_url: "./data",
+  data_url: DEFAULT_DATA_URL,
   gene: "AFP", chrom: "chr4", pos: 73436220,
   cell_type: "Hepatocytes", window_kb: 100,
   threshold: GPS_THRESHOLD, n_major: N_MAJOR_GROUPS, min_cov: 0.5,
@@ -132,7 +136,9 @@ export function render({ model, el }: { model: AnyModel; el: HTMLElement }): () 
 
   // --- controller ----------------------------------------------------------------
   let meta: StoreMeta | null = null;
-  const ctl = new Controller(new DataSource(get("data_url")), figure, {
+  const pageDefault = (globalThis as { F6E_DATA_URL?: string }).F6E_DATA_URL;
+  const dataUrl = (model.get("data_url") as string | undefined) || pageDefault || DEFAULT_DATA_URL;
+  const ctl = new Controller(new DataSource(dataUrl), figure, {
     onMeta: (m) => {
       meta = m;
       ctSel.replaceChildren(...m.cell_types.map((c) => h("option", { value: c }, c.replaceAll("_", " "))));

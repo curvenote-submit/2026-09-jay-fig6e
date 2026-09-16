@@ -37,7 +37,7 @@ network failures are not cached, so a later hover retries.
 
 | key | type | default | direction |
 |---|---|---|---|
-| `data_url` | string | `"./data"` | in — base URL holding `steam_v1_gps.zarr/`, `tree.nwk`, `gene_tss.json`, `genes/` |
+| `data_url` | string | public S3 bucket | in — base URL holding `steam_v1_gps.zarr/`, `tree.nwk`, `gene_tss.json`, `genes/`. Resolution order: model key (the directive body) → `globalThis.F6E_DATA_URL` → built-in default. Must send CORS headers. |
 | `gene` | string | `"AFP"` | both — resolved to `chrom`/`pos` via `gene_tss.json` |
 | `chrom`, `pos` | string, int | `"chr4"`, `73436220` | both — hg38 anchor (TSS) |
 | `cell_type` | string | `"Hepatocytes"` | both — must be an array in the store |
@@ -93,6 +93,8 @@ bun run test           # JS enhancer calls / synteny groups == Python golden fil
 Node 24 runs the `.ts` sources directly, so the tests import them without a build.
 
 `DATA_DIR=/elsewhere bun run dev` points the dev server at another data folder.
+The harness takes `?data=local` (default, the dev server's `/data`), `?data=s3`
+(the public bucket) or `?data=<any url>`.
 The golden files in `test/` come from `../../steam-fig6e-explorer/export_golden.py`.
 
 ## Using it

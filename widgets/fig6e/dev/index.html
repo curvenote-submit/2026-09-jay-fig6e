@@ -23,7 +23,12 @@
         _state: state,
       };
     }
-    const model = createMockModel({ data_url: "/data" });
+    // ?data=local (default: the dev server's /data) · ?data=s3 (the public bucket) · ?data=<any url>
+    const q = new URLSearchParams(location.search).get("data") ?? "local";
+    const S3 = "https://cn-scms-datastore.s3.us-east-1.amazonaws.com/csev-steam-1/data";
+    const data_url = q === "local" ? "/data" : q === "s3" ? S3 : q;
+    document.title = `fig6e widget dev · ${q}`;
+    const model = createMockModel({ data_url });
     globalThis.model = model;
     widget.render({ model, el: document.getElementById("w") });
   </script>

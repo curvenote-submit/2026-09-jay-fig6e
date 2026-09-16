@@ -11,7 +11,7 @@ synteny group | accessibility heatmap**.
 ```{anywidget} ../widgets/fig6e/dist/index.js
 :css: ../widgets/fig6e/dist/styles.css
 {
-  "data_url": "http://localhost:3002/data",
+  "data_url": "https://cn-scms-datastore.s3.us-east-1.amazonaws.com/csev-steam-1/data",
   "gene": "AFP",
   "chrom": "chr4",
   "pos": 73436220,
@@ -21,8 +21,10 @@ synteny group | accessibility heatmap**.
 ```
 
 :::{note} Phase 0 preview
-Only **chr4 × Hepatocytes** is in the store so far, served from a local dev
-server. The `GPS ≥`, `Groups` and `Min cov` controls recompute in the browser
+Only **chr4 × Hepatocytes** is in the store so far. The store is the
+`data_url` in the directive above (an S3 bucket; a local dev server such as
+`http://localhost:3002/data` works too — any CORS-enabled URL with the same
+layout). The `GPS ≥`, `Groups` and `Min cov` controls recompute in the browser
 without refetching; changing the gene, cell class or window fetches a new slice
 (a few hundred KB).
 
