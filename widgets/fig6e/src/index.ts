@@ -10,6 +10,7 @@
 import { Controller, DataSource, type ChangePatch } from "./controller";
 import { GPS_THRESHOLD, N_MAJOR_GROUPS } from "./compute";
 import type { AnyModel, Params, Status, StoreMeta } from "./types";
+import { ICON } from "./icons";
 
 interface ModelKeys {
   data_url: string;
@@ -82,8 +83,10 @@ export function render({ model, el }: { model: AnyModel; el: HTMLElement }): () 
   const status = h("div", { class: "f6e-status" });
   const msg = h("div", { class: "f6e-msg" });
   const figure = h("div", { class: "f6e-figure" });
-  const resetBtn = h("button", { type: "button", class: "f6e-reset", title: "Back to the anchor ± window at the default row height (or double-click the figure)" }, "⟲");
-  const ucsc = h("a", { class: "f6e-ucsc", target: "_blank", rel: "noopener", title: "Open the current window in the UCSC Genome Browser (hg38)" }, "UCSC ↗");
+  const resetBtn = h("button", { type: "button", class: "f6e-reset", title: "Back to the anchor ± window at the default row height (or double-click the figure)" });
+  resetBtn.innerHTML = ICON.reset;
+  const ucsc = h("a", { class: "f6e-ucsc", target: "_blank", rel: "noopener", title: "Open the current window in the UCSC Genome Browser (hg38)" }, "UCSC ");
+  ucsc.insertAdjacentHTML("beforeend", ICON.external);
   const updateUcsc = () => {
     const v = ctl.view;
     if (!v) return;

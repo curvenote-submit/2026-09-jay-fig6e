@@ -8,6 +8,9 @@ import { MISSING, groupColor } from "./compute";
 import { abbreviate } from "./tree";
 import type { TreeLayout } from "./tree";
 import type { Call, Gene, GroupSummary, Slice } from "./types";
+import { wikiSummary, shortExtract } from "./wiki";
+import { geneInfo } from "./geneinfo";
+import { ICON } from "./icons";
 
 export interface FigureParams { threshold: number; nMajor: number; minCov: number; highlight: string[]; showGaps: boolean }
 export interface FigureView {
@@ -25,6 +28,8 @@ export interface FigureView {
   selectedGroup?: number | null;
   rowPx?: number | null;
   rowOffset?: number;
+  /** zoom limits, so the buttons can disable at the ends */
+  limits?: { minSpan: number; maxSpan: number; chromLen: number; rowPxMax: number };
 }
 export interface FigureCallbacks {
   onHover?(info: { species: string; bp: number; gps: number | null } | null): void;
@@ -151,17 +156,20 @@ export function paintHeatmap(rows: Uint8Array[], order: number[], showGaps = fal
  * overrides the row height and `v.rowOffset` (px) scrolls the rows behind a clip.
  */
 export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks = {}): FigureHandle | null {
-  root.replaceChildren();
+  // Measure first, then build the new figure detached and swap it in at the
+  // end: emptying the container before layout would shrink the page for a
+  // frame and make the browser clamp the scroll position on every pan tick.
+  const width = Math.max(640, root.clientWidth || 900);
   const { slice, order, tree, calls, params, anchor, tracks, genes = [], selectedGroup = null } = v;
   const nRows = order.length;
   if (nRows === 0) {
     const d = document.createElement("div");
     d.className = "f6e-empty";
     d.textContent = "No species pass the coverage filter in this window (or no data here yet).";
-    root.appendChild(d);
+    root.style.minHeight = "";
+    root.replaceChildren(d);
     return null;
   }
-  const width = Math.max(640, root.clientWidth || 900);
   const autoRowH = Math.max(2.5, Math.min(12, 720 / Math.max(nRows, 1)));
   const rowH = v.rowPx ?? autoRowH;
   const heatH = Math.round(autoRowH * nRows);          // viewport height: fixed regardless of row zoom
@@ -194,7 +202,7 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
   const fig = document.createElement("div");
   fig.className = "f6e-fig";
   fig.style.height = `${totalH}px`;
-  root.appendChild(fig);
+  root.style.minHeight = `${totalH}px`;   // keeps the page height stable during the swap
 
   // --- heatmap canvas ------------------------------------------------------
   const canvas = document.createElement("canvas");
@@ -230,6 +238,17 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
     for (const e of tree.edges) svgEl("line", { x1: sx(e.x0), y1: y(e.y0 + 0.5), x2: sx(e.x1), y2: y(e.y1 + 0.5) }, g);
   }
 
+  // cross-panel position guides: hovering the heatmap marks the same bp on the
+  // calls panel (grey), hovering the calls panel marks it on the heatmap (white)
+  const vCalls = svgEl("line", { y1: top, y2: top + heatH, stroke: DIM, "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0, "pointer-events": "none" }, svg);
+  const vHeat = svgEl("line", { y1: top, y2: top + heatH, stroke: "#fff", "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0, "pointer-events": "none" }, svg);
+  const setGuides = (bp: number | null, from: "heat" | "calls") => {
+    if (bp === null) { vCalls.setAttribute("opacity", "0"); vHeat.setAttribute("opacity", "0"); return; }
+    const l = from === "heat" ? vCalls : vHeat, xx = from === "heat" ? xCalls(bp) : x(bp);
+    l.setAttribute("x1", String(xx)); l.setAttribute("x2", String(xx)); l.setAttribute("opacity", "0.9");
+    (from === "heat" ? vHeat : vCalls).setAttribute("opacity", "0");
+  };
+
   // row highlight (moved on hover)
   const hlRow = svgEl("rect", { x: 0, y: 0, width, height: rowH, fill: FG, opacity: 0, "pointer-events": "none" }, rowsG);
   const setHoverRow = (r: number | null) => {
@@ -254,8 +273,10 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
   });
 
   // calls panel
-  svgEl("rect", { x: treeW + labelW + gap, y: top, width: callsW, height: heatH, fill: "none", stroke: FAINT, "pointer-events": "none" }, svg);
+  const callsX0 = treeW + labelW + gap;
+  svgEl("rect", { x: callsX0, y: top, width: callsW, height: heatH, fill: "none", stroke: FAINT, "pointer-events": "none" }, svg);
   const cg = svgEl("g", {}, rowsG);
+  svgEl("rect", { x: callsX0, y: top, width: callsW, height: heatH, fill: "transparent", class: "f6e-callsbg" }, cg);   // catches hover between calls
   for (const c of calls) {
     const r = v.rowPos.get(c.row);
     if (r === undefined || y(r) + rowH < top || y(r) > top + heatH) continue;
@@ -343,8 +364,8 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
       const isSel = selectedGroup === it.g, dimmed = selectedGroup !== null && !isSel;
       const item = svgEl("g", { class: it.g ? "f6e-legitem" : "", opacity: dimmed ? 0.4 : 1 }, lg);
       if (it.s) svgEl("title", {}, item).textContent = `group ${it.g}: ${it.s.n_enhancers} enhancers in ${it.s.n_species} species · ${(it.s.mean_dist_to_tss / 1000).toFixed(1)} kb from TSS · click to ${isSel ? "clear" : "isolate"}`;
-      if (isSel) svgEl("rect", { x: lx - 2, y: ly - 1, width: colW - 4, height: LEG_ROW - 1, fill: "#e2e8f0", rx: 2 }, item);
-      svgEl("rect", { x: lx, y: ly, width: 12, height: 12, rx: 2, fill: groupColor(it.g, params.nMajor) }, item);
+      if (isSel) svgEl("rect", { x: lx - 2, y: ly - 1, width: colW - 4, height: LEG_ROW - 1, fill: "#e2e8f0" }, item);
+      svgEl("rect", { x: lx, y: ly, width: 12, height: 12, fill: groupColor(it.g, params.nMajor) }, item);
       svgEl("text", { x: lx + 15, y: ly + 9.5, "font-weight": isSel ? 600 : 400 }, item).textContent = it.label;
       svgEl("rect", { x: lx - 2, y: ly - 1, width: colW - 4, height: LEG_ROW - 1, fill: "transparent" }, item);  // hit area
       if (it.g) item.addEventListener("click", () => cb.onSelectGroup?.(isSel ? null : it.g));
@@ -450,37 +471,79 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
     const sbX = heatX + heatW - 5, thumbH = Math.max(12, (heatH / contentH) * heatH);
     svgEl("rect", { x: sbX, y: top, width: 4, height: heatH, fill: FAINT, rx: 2, "pointer-events": "none" }, svg);
     svgEl("rect", { x: sbX, y: top + (off / contentH) * heatH, width: 4, height: thumbH, fill: DIM, rx: 2, "pointer-events": "none" }, svg);
-    svgEl("text", { x: sbX - 4, y: top + 10, "text-anchor": "end", "font-size": 9, fill: DIM, "pointer-events": "none" }, svg)
+    svgEl("text", { x: heatX + 6, y: top + 11, "text-anchor": "start", "font-size": 9, fill: "#fff", opacity: 0.85, "pointer-events": "none" }, svg)
       .textContent = `rows ${rowAt(top) + 1}–${Math.min(nRows, rowAt(top + heatH - 1) + 1)} of ${nRows}`;
   }
 
-  // --- zoom buttons --------------------------------------------------------
-  const btns = document.createElement("div");
-  btns.className = "f6e-zoom";
-  btns.style.cssText = `left:${heatX + heatW - 50}px;top:2px`;
-  const zoomBtns: [string, string, () => void][] = [
-    ["−", "zoom out (ctrl+wheel)", () => cb.onZoom?.(2, (slice.startBp + slice.endBp) / 2)],
-    ["+", "zoom in (ctrl+wheel, or drag on the tracks)", () => cb.onZoom?.(0.5, (slice.startBp + slice.endBp) / 2)],
-  ];
-  for (const [label, title, fn] of zoomBtns) {
-    const b = document.createElement("button");
-    b.type = "button"; b.textContent = label; b.title = title;
-    b.addEventListener("click", (e) => { e.stopPropagation(); fn(); });
-    btns.appendChild(b);
-  }
-  fig.appendChild(btns);
+  // --- hover-only button groups: x-zoom inside the heatmap's top-right corner,
+  //     row expand/contract inside the calls panel's. Each group appears while
+  //     the pointer is over its panel (or over the buttons themselves).
+  const buttonGroup = (left: number, items: [string, string, () => void, boolean][]) => {
+    const div = document.createElement("div");
+    div.className = "f6e-zoom";
+    div.style.cssText = `left:${left}px;top:${top + 4}px`;
+    for (const [icon, title, fn, enabled] of items) {
+      const b = document.createElement("button");
+      b.type = "button"; b.innerHTML = icon; b.title = title; b.disabled = !enabled;
+      b.addEventListener("click", (e) => { e.stopPropagation(); fn(); });
+      b.addEventListener("dblclick", (e) => e.stopPropagation());
+      div.appendChild(b);
+    }
+    fig.appendChild(div);
+    return div;
+  };
+  // Which panel the pointer is over is remembered on the root, because every
+  // pan tick rebuilds the figure: a rebuilt group starts in the same shown/hidden
+  // state (without the fade), so the buttons do not flicker while dragging.
+  const hoverState = root as HTMLElement & { _f6eHover?: Record<string, boolean> };
+  hoverState._f6eHover ??= {};
+  const hoverReveal = (key: string, group: HTMLElement, ...areas: Element[]) => {
+    let timer = 0;
+    if (hoverState._f6eHover![key]) { group.classList.add("f6e-zoom-now", "f6e-zoom-on"); }
+    const show = () => { clearTimeout(timer); hoverState._f6eHover![key] = true; group.classList.remove("f6e-zoom-now"); group.classList.add("f6e-zoom-on"); };
+    const hide = () => {
+      clearTimeout(timer);
+      timer = window.setTimeout(() => { hoverState._f6eHover![key] = false; group.classList.remove("f6e-zoom-on", "f6e-zoom-now"); }, 150);
+    };
+    for (const a of [group, ...areas]) { a.addEventListener("mouseenter", show); a.addEventListener("mouseleave", hide); }
+  };
+  const lim = v.limits ?? { minSpan: 0, maxSpan: Infinity, chromLen: Infinity, rowPxMax: Infinity };
+  // the slice is snapped to whole bins, so compare with a one-bin tolerance
+  const canZoomIn = span > lim.minSpan + slice.binBp, canZoomOut = span < Math.min(lim.maxSpan, lim.chromLen) - slice.binBp;
+  const xZoom = buttonGroup(heatX + heatW - 54, [
+    [ICON.minus, "zoom out (ctrl+wheel)", () => cb.onZoom?.(2, (slice.startBp + slice.endBp) / 2), canZoomOut],
+    [ICON.plus, "zoom in (ctrl+wheel, or drag on the tracks)", () => cb.onZoom?.(0.5, (slice.startBp + slice.endBp) / 2), canZoomIn],
+  ]);
+  hoverReveal("heat", xZoom, canvas);
+  const midRow = rowAt(top + heatH / 2);
+  const canShrink = rowH > autoRowH + 0.05, canGrow = rowH < lim.rowPxMax - 0.05;
+  const rowZoom = buttonGroup(callsX0 + callsW - 54, [
+    [ICON.minus, "shorter rows (pinch the species column)", () => cb.onRowZoom?.(1 / 1.5, midRow, heatH / 2), canShrink],
+    [ICON.plus, "taller rows (pinch the species column)", () => cb.onRowZoom?.(1.5, midRow, heatH / 2), canGrow],
+  ]);
+  hoverReveal("calls", rowZoom, cg);
 
   // --- tooltip ---------------------------------------------------------------
   const tip = document.createElement("div");
   tip.className = "f6e-tip"; tip.hidden = true;
   fig.appendChild(tip);
-  const showTip = (ev: MouseEvent, html: string) => {
+  const showTip = (ev: MouseEvent, html: string, card = false) => {
     const b = fig.getBoundingClientRect();
     tip.innerHTML = html; tip.hidden = false;
-    tip.style.left = `${Math.min(ev.clientX - b.left + 12, width - 230)}px`;
-    tip.style.top = `${ev.clientY - b.top + 12}px`;
+    tip.classList.toggle("f6e-tip-card", card);
+    placeTip(ev, card);
   };
-  const hideTip = () => { tip.hidden = true; setHoverRow(null); hideTrackValues(); cb.onHover?.(null); };
+  /** Below-right of the pointer; flips above when it would run off the figure's bottom. */
+  const placeTip = (ev: MouseEvent, card = false) => {
+    const b = fig.getBoundingClientRect();
+    const w = card ? 270 : 230, hgt = tip.offsetHeight;
+    let y = ev.clientY - b.top + 12;
+    if (y + hgt > totalH) y = Math.max(0, ev.clientY - b.top - 12 - hgt);
+    tip.style.left = `${Math.min(ev.clientX - b.left + 12, width - w)}px`;
+    tip.style.top = `${y}px`;
+  };
+  const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+  const hideTip = () => { tip.hidden = true; setHoverRow(null); hideTrackValues(); setGuides(null, "heat"); cb.onHover?.(null); };
 
   // --- pan by drag: the drag itself is tracked by index.js (it outlives redraws)
   canvas.addEventListener("mousedown", (ev) => { cb.onPanStart?.(ev.clientX, ev.clientY); ev.preventDefault(); });
@@ -492,6 +555,7 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
     const bp = slice.startBp + b * slice.binBp;
     setHoverRow(r);
     showTrackValues(b);
+    setGuides(bp, "heat");
     showTip(ev, `<b>${abbreviate(slice.species[ri])}</b><br>${anchor.chrom}:${bp.toLocaleString()}<br>GPS ${val === MISSING ? "—" : (val / 4).toFixed(2)}`);
     cb.onHover?.({ species: slice.species[ri], bp, gps: val === MISSING ? null : val / 4 });
   });
@@ -513,28 +577,71 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
 
   // calls
   cg.addEventListener("mousemove", (ev) => {
+    const px = ev.clientX - svg.getBoundingClientRect().left;
+    const bp = slice.startBp + ((px - callsX0) / callsW) * span;
+    setGuides(bp, "calls");
+    showTrackValues(Math.max(0, Math.min(n - 1, Math.floor((bp - slice.startBp) / slice.binBp))));
     const c = (ev.target as HitRect)._call;
-    if (!c) { hideTip(); return; }
+    if (!c) { tip.hidden = true; setHoverRow(null); return; }
     setHoverRow(v.rowPos.get(c.row) ?? null);
     showTip(ev, `<b>${abbreviate(c.species)}</b> · group ${c.group || "minor"}<br>${anchor.chrom}:${c.start.toLocaleString()}–${c.end.toLocaleString()}<br>peak GPS ${c.gps_max.toFixed(1)}, mean ${c.gps_mean.toFixed(1)}<br>${(c.dist_to_tss / 1000).toFixed(1)} kb from TSS`);
   });
 
-  // tips: hover row, click toggles highlight
+  // tips: hover row + Wikipedia card, click toggles highlight
+  let hoverSpecies: string | null = null;
+  const speciesCard = (sp: string, w: Awaited<ReturnType<typeof wikiSummary>>) => {
+    const hint = `<span class="f6e-hint">click to ${params.highlight.includes(sp) ? "un-highlight" : "highlight"}</span>`;
+    const latin = `<i>${esc(sp.replaceAll("_", " "))}</i>`;
+    if (!w) return `<b>${latin}</b><br>${hint}`;
+    return `${w.thumb ? `<img class="f6e-tip-img" src="${w.thumb}" alt="">` : ""}` +
+      `<div class="f6e-tip-title">${esc(w.title)}</div><div>${latin}${w.description ? ` · ${esc(w.description)}` : ""}</div>` +
+      `${w.extract ? `<div class="f6e-tip-extract">${esc(shortExtract(w.extract))}</div>` : ""}` +
+      `<div class="f6e-tip-foot">Wikipedia · ${hint}</div>`;
+  };
   tips.addEventListener("mousemove", (ev) => {
     const t = ev.target as HitRect;
     if (t._species === undefined) return;
+    const sp = t._species;
     setHoverRow(t._row ?? null);
-    showTip(ev, `<b>${t._species.replaceAll("_", " ")}</b><br><span class="f6e-hint">click to ${params.highlight.includes(t._species) ? "un-highlight" : "highlight"}</span>`);
+    const same = hoverSpecies === sp;
+    hoverSpecies = sp;
+    if (!same) {
+      showTip(ev, speciesCard(sp, null), true);   // name at once, card when the summary lands
+      void wikiSummary(sp).then((w) => {
+        if (hoverSpecies !== sp || tip.hidden) return;
+        showTip(ev, speciesCard(sp, w), true);
+        tip.querySelector("img")?.addEventListener("load", () => { if (hoverSpecies === sp) placeTip(ev, true); });
+      });
+    } else {
+      placeTip(ev, true);   // keep following the pointer without re-rendering the card
+    }
   });
+  tips.addEventListener("mouseleave", () => { hoverSpecies = null; });
   tips.addEventListener("click", (ev) => { const sp = (ev.target as HitRect)._species; if (sp) cb.onTipClick?.(sp); });
 
-  // genes: hover + click recentres
+  // genes: hover shows a MyGene.info card, click recentres
   const geneOf = (ev: Event) => ((ev.target as Element).closest?.(".f6e-gene") as GeneGroup | null)?._gene;
+  let hoverGene: string | null = null;
+  const geneCard = (g: Gene, info: Awaited<ReturnType<typeof geneInfo>>) => {
+    const head = `<div class="f6e-tip-title"><i>${esc(g.name)}</i>${info?.name ? ` · ${esc(info.name)}` : ""}</div>`;
+    const where = `${anchor.chrom}:${g.start.toLocaleString()}–${g.end.toLocaleString()} (${g.strand >= 0 ? "+" : "−"})` +
+      `${info?.cytoband ? ` · ${esc(info.cytoband)}` : ""}${info?.type ? ` · ${esc(info.type)}` : ""}`;
+    const summary = info?.summary ? `<div class="f6e-tip-extract">${esc(shortExtract(info.summary, 260))}</div>` : "";
+    const aliases = info?.aliases.length ? `<div class="f6e-tip-extract">also: ${esc(info.aliases.slice(0, 6).join(", "))}</div>` : "";
+    const ids = info ? [info.entrez && `NCBI Gene ${info.entrez}`, info.ensembl, info.hgnc && `HGNC:${info.hgnc}`].filter(Boolean).join(" · ") : "";
+    const foot = `<div class="f6e-tip-foot">${ids ? `${esc(ids)} · MyGene.info · ` : ""}<span class="f6e-hint">click to centre on its TSS</span></div>`;
+    return `${head}<div>${where}</div>${summary}${aliases}${foot}`;
+  };
   gg.addEventListener("mousemove", (ev) => {
     const g = geneOf(ev);
-    if (!g) { hideTip(); return; }
-    showTip(ev, `<i>${g.name}</i> (${g.strand >= 0 ? "+" : "−"})<br>${anchor.chrom}:${g.start.toLocaleString()}–${g.end.toLocaleString()}<br><span class="f6e-hint">click to centre on its TSS</span>`);
+    if (!g) { hideTip(); hoverGene = null; return; }
+    const same = hoverGene === g.name;
+    hoverGene = g.name;
+    if (same) { placeTip(ev, true); return; }
+    showTip(ev, geneCard(g, null), true);
+    void geneInfo(g.name).then((info) => { if (hoverGene === g.name && !tip.hidden) showTip(ev, geneCard(g, info), true); });
   });
+  gg.addEventListener("mouseleave", () => { hoverGene = null; });
   gg.addEventListener("click", (ev) => {
     const g = geneOf(ev);
     if (g) cb.onGeneClick?.(g);
@@ -554,6 +661,8 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
 
   fig.addEventListener("dblclick", () => cb.onReset?.());
   for (const e of [canvas, cg, tips, gg, brushArea]) e.addEventListener("mouseleave", hideTip);
+
+  root.replaceChildren(fig);
 
   return {
     canvas, svg, setHoverRow,

@@ -11,6 +11,7 @@ import { drawFigure, fmtBp, type FigureHandle } from "./draw";
 import type { Call, Gene, Params, Slice, Status, StoreMeta, View } from "./types";
 
 export const MIN_SPAN = 2_000, MAX_SPAN = 4_000_000;   // bp; 4 Mb = ~20 chunks, ~10 MB decoded
+export const ROW_PX_MAX = 24;
 
 /** Model keys the figure can change from inside (widget -> host). */
 export interface ChangePatch {
@@ -189,6 +190,7 @@ export class Controller {
       genes: this.genes,
       params: { threshold: p.threshold, nMajor: p.nMajor, minCov: p.minCov, highlight: p.highlight ?? [], showGaps: !!p.showGaps },
       rowPx: p.rowPx ?? null, rowOffset: this.rowOff,
+      limits: { minSpan: MIN_SPAN, maxSpan: MAX_SPAN, chromLen: this.meta?.chrom_sizes[p.chrom] ?? Infinity, rowPxMax: ROW_PX_MAX },
     }, {
       onTipClick: (sp) => {
         const hl = [...(p.highlight ?? [])], i = hl.indexOf(sp);
@@ -206,7 +208,7 @@ export class Controller {
       onRowZoom: (factor, row, cursorY) => {
         const g = this.figure?.geom; if (!g) return;
         // floor at the fit-all height: zooming out never leaves the tree shorter than the figure
-        const newPx = Math.min(24, Math.max(g.autoRowH, g.rowH * factor));
+        const newPx = Math.min(ROW_PX_MAX, Math.max(g.autoRowH, g.rowH * factor));
         const frac = (cursorY - (row * g.rowH - g.off)) / g.rowH;
         this.rowOff = Math.max(0, Math.min((row + frac) * newPx - cursorY, Math.max(0, newPx * g.nRows - g.heatH)));
         this.cb.onChange({ row_px: Math.abs(newPx - g.autoRowH) < 0.05 ? null : newPx });

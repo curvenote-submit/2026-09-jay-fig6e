@@ -18,6 +18,21 @@ its height; scroll or drag vertically to move through the rows), **click a speci
 its highlight, **click a gene** to recentre on its TSS, **click a legend swatch**
 to isolate a synteny group. Hover anything for details.
 
+## Hover cards (third-party lookups)
+
+Two hovers call public APIs at view time; nothing else leaves the page:
+
+- **Species** (tree/label column): Wikipedia's REST summary endpoint
+  (`en.wikipedia.org/api/rest_v1/page/summary/<Latin_name>`) — common name,
+  one-line description, first paragraph, thumbnail. Wikipedia's own redirects
+  map the Zoonomia binomials to the common-name articles.
+- **Genes** (gene track): MyGene.info (`mygene.info/v3/query?q=symbol:X&species=human`)
+  — HGNC name, gene type, cytoband, aliases, NCBI/Ensembl/HGNC IDs and the
+  RefSeq summary paragraph where one exists.
+
+Both are cached per name for the widget's lifetime (`wiki.ts`, `geneinfo.ts`);
+network failures are not cached, so a later hover retries.
+
 ## Model
 
 | key | type | default | direction |
