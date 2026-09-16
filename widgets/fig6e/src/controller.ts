@@ -47,6 +47,7 @@ export class Controller {
   private drag: { x: number; y: number; moved: boolean } | null = null;
   private brush: { x0: number; x1: number } | null = null;
   private panPending: number | null = null;
+  private wheelSettle = 0;   // debounce: sync the model once a wheel-pan pauses
   private panRaf = 0;
   private redrawRaf = 0;
   private seq = 0;
@@ -65,7 +66,7 @@ export class Controller {
     this.ro.disconnect();
     window.removeEventListener("mousemove", this._onMove);
     window.removeEventListener("mouseup", this._onUp);
-    cancelAnimationFrame(this.panRaf); cancelAnimationFrame(this.redrawRaf);
+    cancelAnimationFrame(this.panRaf); cancelAnimationFrame(this.redrawRaf); clearTimeout(this.wheelSettle);
     this.host.replaceChildren();
   }
 
@@ -229,6 +230,16 @@ export class Controller {
         this.rowOff = next; this.scheduleRedraw(); return true;
       },
       onReset: () => this.reset(),
+      onWheelPan: (dBp) => {
+        this.panPending = (this.panPending ?? 0) + dBp;
+        if (!this.panRaf) this.panRaf = requestAnimationFrame(() => {
+          this.panRaf = 0;
+          const d = this.panPending; this.panPending = null;
+          if (d && this.view) void this.setView({ startBp: this.view.startBp + d, endBp: this.view.endBp + d }, true);
+        });
+        clearTimeout(this.wheelSettle);
+        this.wheelSettle = window.setTimeout(() => { if (this.view) void this.setView(this.view); }, 200);
+      },
       onGeneClick: (g) => this.cb.onChange({ gene: g.name, pos: g.strand >= 0 ? g.start : g.end }),
     });
   }

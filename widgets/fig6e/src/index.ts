@@ -108,7 +108,7 @@ export function render({ model, el }: { model: AnyModel; el: HTMLElement }): () 
       h("span", { class: "f6e-right" }, ucsc, resetBtn)),
     status, msg, figure,
     h("div", { class: "f6e-hint-bar" },
-      "drag the heatmap to pan · drag on the tracks or pinch the heatmap to zoom · pinch the species column to resize rows, then scroll or drag vertically · Reset (or double-click) to go back · click a species, a gene, a synteny group, or the “no alignment” swatch"),
+      "drag or scroll sideways on the heatmap to pan · drag on the tracks or pinch the heatmap to zoom · pinch the species column to resize rows, then scroll or drag vertically · Reset (or double-click) to go back · click a species, a gene, a synteny group, or the “no alignment” swatch"),
   );
   winSel.value = String(get("window_kb"));
 

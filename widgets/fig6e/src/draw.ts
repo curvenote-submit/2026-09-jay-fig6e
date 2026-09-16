@@ -41,6 +41,7 @@ export interface FigureCallbacks {
   onZoom?(factor: number, centreBp: number): void;
   onRowZoom?(factor: number, row: number, cursorY: number): void;
   onRowScroll?(dy: number): boolean;
+  onWheelPan?(dBp: number): void;
   onReset?(): void;
   onGeneClick?(gene: Gene): void;
 }
@@ -633,6 +634,12 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
   const zoomFactor = (ev: WheelEvent) => Math.exp(Math.max(-60, Math.min(60, ev.deltaY)) * 0.006);
   canvas.addEventListener("wheel", (ev) => {
     if (ev.ctrlKey || ev.metaKey) { ev.preventDefault(); cb.onZoom?.(zoomFactor(ev), bpAt(heatX + ev.offsetX)); return; }
+    // horizontal wheel (trackpad swipe, or shift+wheel) pans along the chromosome
+    const dx = ev.shiftKey && !ev.deltaX ? ev.deltaY : ev.deltaX;
+    if (Math.abs(dx) > Math.abs(ev.deltaY) || ev.shiftKey) {
+      if (dx) { ev.preventDefault(); cb.onWheelPan?.((dx / heatW) * span); }
+      return;
+    }
     if (maxOff > 0 && cb.onRowScroll?.(ev.deltaY)) ev.preventDefault();
   }, { passive: false });
   // wheel over the species / calls columns: pinch changes the row height
