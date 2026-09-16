@@ -42,8 +42,6 @@
 .f6e-gapswatch { cursor: pointer; }
 .f6e-gapswatch:hover text { fill: #0d9488; }
 .f6e-rowsbg { cursor: ns-resize; }
-.f6e-legitem { cursor: pointer; }
-.f6e-legitem:hover text { fill: #0d9488; }
 .f6e-right { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
 .f6e-ucsc { font-size: 12px; color: #0d9488; text-decoration: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 2px; }
 .f6e-ucsc:hover { text-decoration: underline; }
@@ -65,3 +63,4 @@
 .f6e-kv { display: grid; grid-template-columns: max-content 1fr; gap: 2px 10px; margin: 5px 0 6px; font-variant-numeric: tabular-nums; }
 .f6e-kv-k { color: #94a3b8; }
 .f6e-kv-v b { color: #fff; }
+.f6e-groupdot { cursor: pointer; }
