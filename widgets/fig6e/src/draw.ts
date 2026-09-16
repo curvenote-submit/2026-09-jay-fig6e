@@ -17,7 +17,7 @@ export interface FigureView {
   tree: TreeLayout;
   calls: Call[];
   params: FigureParams;
-  anchor: { chrom: string; pos: number };
+  anchor: { chrom: string; pos: number; strand?: "+" | "-" | null };
   tracks: { cov: Float32Array; sum: Float32Array };
   genes?: Gene[];
   summary?: GroupSummary[];
@@ -88,9 +88,13 @@ export function genomicTicks(start: number, end: number, target = 6): number[] {
   return ticks;
 }
 
+/** Always kb — the axis must not switch units as you zoom out. */
+export function fmtKb(bp: number): string {
+  return `${(bp / 1000).toLocaleString(undefined, { maximumFractionDigits: bp % 1000 ? 1 : 0 })} kb`;
+}
+/** Span label for the status tile (kb, Mb when large). */
 export function fmtBp(bp: number): string {
-  return bp >= 1e6 && bp % 1e5 === 0 ? `${(bp / 1e6).toFixed(1)} Mb`
-    : `${(bp / 1000).toLocaleString(undefined, { maximumFractionDigits: bp % 1000 ? 1 : 0 })} kb`;
+  return bp >= 1e6 && bp % 1e5 === 0 ? `${(bp / 1e6).toFixed(1)} Mb` : fmtKb(bp);
 }
 
 /** fig6e_core._pack_genes: greedy UCSC-style packing into rows. Returns [{gene,row}], nRows. */
@@ -175,7 +179,8 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
   const CB_X = 8, CB_Y = 12, CB_H = 9, LEG_Y0 = CB_Y + CB_H + 26, LEG_ROW = 15, LEG_PER_ROW = 6;
   const legendItems = (v.summary ?? []).length + 1;                       // + "minor"
   const legendH = LEG_Y0 + Math.ceil(legendItems / LEG_PER_ROW) * LEG_ROW;
-  const top = Math.max(trackH * 2 + geneH, legendH) + gap;
+  const vGap = 20;   // room between the gene track and the heatmap for the TSS tick + arrow
+  const top = Math.max(trackH * 2 + geneH, legendH) + vGap;
   const totalH = top + heatH + axisH;
   const span = slice.endBp - slice.startBp;
   const n0 = slice.rows[0].length;
@@ -261,11 +266,28 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
     }, cg) as HitRect;
     rect._call = c;
   }
-  // anchor marker on calls + heatmap
+  // anchor (TSS) marker: dotted line inside both plot boxes, plus the paper's
+  // tick + strand arrow just above the heatmap (arrow = direction of transcription)
   if (anchor.pos >= slice.startBp && anchor.pos <= slice.endBp) {
     for (const xa of [xCalls(anchor.pos), x(anchor.pos)]) {
-      svgEl("line", { x1: xa, y1: top - geneH - 4, x2: xa, y2: top + heatH, stroke: HL, "stroke-width": 1, "stroke-dasharray": "2 3", opacity: 0.8, "pointer-events": "none" }, svg);
+      svgEl("line", { x1: xa, y1: top, x2: xa, y2: top + heatH, stroke: HL, "stroke-width": 1, "stroke-dasharray": "2 3", opacity: 0.8, "pointer-events": "none" }, svg);
     }
+    const xa = x(anchor.pos), ya = top - vGap / 2;   // vertically centred in the gap
+    const tss = svgEl("g", { stroke: HL, fill: HL, "stroke-width": 1.2, class: "f6e-tss" }, svg);
+    svgEl("line", { x1: xa, y1: ya - 4, x2: xa, y2: ya + 3 }, tss);
+    let tipText = `Anchor: ${anchor.chrom}:${anchor.pos.toLocaleString()} (dotted line). Enhancer distances are measured from here.`;
+    if (anchor.strand) {
+      // a fixed 22 px arrow: it shows direction only, not extent
+      const dir = anchor.strand === "+" ? 1 : -1;
+      const xe = Math.max(heatX, Math.min(heatX + heatW, xa + dir * 22));
+      svgEl("line", { x1: xa, y1: ya, x2: xe, y2: ya }, tss);
+      svgEl("path", { d: `M${xe},${ya} l${-dir * 5},-2.5 l0,5 Z`, stroke: "none" }, tss);
+      tipText = `Transcription start site of the anchor gene, on the ${anchor.strand} strand. The arrow shows the direction the gene is transcribed (${anchor.strand === "+" ? "left to right" : "right to left"}); the dotted line marks the same position in both panels and is the zero point for distance-to-TSS.`;
+    }
+    // hit area so the tooltip is easy to reach
+    svgEl("rect", { x: Math.min(xa, xa + (anchor.strand === "-" ? -26 : 0)) - 4, y: ya - 6, width: 34, height: 12, fill: "transparent", stroke: "none" }, tss);
+    tss.addEventListener("mousemove", (ev) => showTip(ev, tipText));
+    tss.addEventListener("mouseleave", () => { tip.hidden = true; });
   }
 
   // colourbar (top-left, where the matplotlib figure keeps its legend)
@@ -283,6 +305,22 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
       svgEl("line", { x1: tx, y1: cbY + cbH, x2: tx, y2: cbY + cbH + 3, stroke: FG }, g);
       svgEl("text", { x: tx, y: cbY + cbH + 12, "text-anchor": t === 0 ? "start" : t === VMAX ? "end" : "middle" }, g).textContent = t === VMAX ? `≥${t}` : String(t);
     }
+    // threshold marker on the colourbar. It is rebuilt with the figure, so to
+    // glide with the slider the new marker starts where the old one was and
+    // transitions to its new position.
+    {
+      const tx = cbX + (Math.min(params.threshold, VMAX) / VMAX) * cbW;
+      const prev = (root as HTMLElement & { _f6eThrX?: number })._f6eThrX ?? tx;
+      const m = svgEl("g", { class: "f6e-thr", "pointer-events": "none" }, g);
+      svgEl("line", { x1: 0, y1: cbY - 1, x2: 0, y2: cbY + cbH + 1, stroke: "#fff", "stroke-width": 3 }, m);
+      svgEl("line", { x1: 0, y1: cbY - 1, x2: 0, y2: cbY + cbH + 1, stroke: FG, "stroke-width": 1.2 }, m);
+      svgEl("path", { d: `M-3.5,${cbY + cbH + 5} L3.5,${cbY + cbH + 5} L0,${cbY + cbH + 1} Z`, fill: FG }, m);
+      m.style.transform = `translateX(${prev}px)`;
+      requestAnimationFrame(() => { m.style.transform = `translateX(${tx}px)`; });
+      (root as HTMLElement & { _f6eThrX?: number })._f6eThrX = tx;
+      svgEl("title", {}, m).textContent = `enhancer-calling cutoff: GPS ≥ ${params.threshold}`;
+    }
+
     // "no alignment" swatch: click to toggle between the colour-map floor (the
     // paper's encoding) and white, so gaps can be told apart from closed chromatin
     const mx = cbX + cbW + 14;
@@ -343,7 +381,8 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
   // gene track
   const gg = svgEl("g", { "font-size": 9, fill: FG }, svg);
   const gy0 = trackH * 2 + 3;
-  if (geneRows) svgEl("text", { x: heatX - 4, y: gy0 + 10, "text-anchor": "end" }, gg).textContent = "genes";
+  // title aligned with the Coverage / Σ GPS axis titles (same x, colour and size)
+  if (geneRows) svgEl("text", { x: heatX - 34, y: gy0 + geneH / 2 - 3, "text-anchor": "end", "dominant-baseline": "middle", "font-size": 9, fill: DIM }, gg).textContent = "Genes";
   for (const { gene: g, row } of packed) {
     if (row >= MAX_GENE_ROWS) continue;
     const yy = gy0 + row * GENE_ROW_H + GENE_ROW_H / 2;
@@ -372,10 +411,13 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
   svgEl("line", { x1: heatX, y1: top + heatH + 0.5, x2: heatX + heatW, y2: top + heatH + 0.5, stroke: FG }, ax);
   for (const t of genomicTicks(slice.startBp, slice.endBp)) {
     svgEl("line", { x1: x(t), y1: top + heatH, x2: x(t), y2: top + heatH + 4, stroke: FG }, ax);
-    svgEl("text", { x: x(t), y: top + heatH + 15, "text-anchor": "middle" }, ax).textContent = fmtBp(t);
+    svgEl("text", { x: x(t), y: top + heatH + 15, "text-anchor": "middle" }, ax).textContent = fmtKb(t);
   }
+  // x-axis title for the calls panel
+  svgEl("text", { x: treeW + labelW + gap + callsW / 2, y: top + heatH + 15, "text-anchor": "middle", "font-size": 9, fill: FG }, ax)
+    .textContent = "Enhancers (Synteny Group)";
   svgEl("text", { x: heatX + heatW, y: totalH - 2, "text-anchor": "end", "font-size": 9, fill: DIM }, ax)
-    .textContent = `${anchor.chrom}:${slice.startBp.toLocaleString()}–${slice.endBp.toLocaleString()} (${fmtBp(span)}), hg38`;
+    .textContent = `${anchor.chrom}:${slice.startBp.toLocaleString()}–${slice.endBp.toLocaleString()} (${fmtKb(span)}), hg38`;
 
   // row scrollbar (only when rows overflow the viewport)
   if (maxOff > 0) {
@@ -389,11 +431,10 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
   // --- zoom buttons --------------------------------------------------------
   const btns = document.createElement("div");
   btns.className = "f6e-zoom";
-  btns.style.cssText = `left:${heatX + heatW - 74}px;top:2px`;
+  btns.style.cssText = `left:${heatX + heatW - 50}px;top:2px`;
   const zoomBtns: [string, string, () => void][] = [
     ["−", "zoom out (ctrl+wheel)", () => cb.onZoom?.(2, (slice.startBp + slice.endBp) / 2)],
     ["+", "zoom in (ctrl+wheel, or drag on the tracks)", () => cb.onZoom?.(0.5, (slice.startBp + slice.endBp) / 2)],
-    ["⟲", "reset window and row height (double-click)", () => cb.onReset?.()],
   ];
   for (const [label, title, fn] of zoomBtns) {
     const b = document.createElement("button");

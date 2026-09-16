@@ -1,8 +1,8 @@
 // Imperative core of the widget: owns the view (genomic window + row zoom),
 // streams data, runs the compute, draws the figure into a host element, and
-// handles the figure's mouse interactions. React (App.tsx) renders the
-// controls and status tiles around it and talks to it through setParams() and
-// two callbacks — nothing in here re-renders React on a pan tick.
+// handles the figure's mouse interactions. The control shell (index.ts) renders
+// the controls and status tiles around it and talks to it through setParams()
+// and two callbacks; the shell never needs to know about pan ticks.
 
 import { DataSource } from "./data";
 import { buildTree } from "./tree";
@@ -77,6 +77,13 @@ export class Controller {
     this.scheduleRedraw();
   }
 
+  /** Back to anchor ± window at the fit-all row height. */
+  reset(): void {
+    this.rowOff = 0;
+    this.cb.onChange({ row_px: null });
+    void this.setView(this.anchorView());
+  }
+
   anchorView(): View {
     const w = this.p!.windowKb * 1000;
     return { startBp: this.p!.pos - w, endBp: this.p!.pos + w };
@@ -145,7 +152,9 @@ export class Controller {
   redraw(): void {
     if (!this.slice || !this.p) return;
     const p = this.p, { rows, species, startBp, binBp } = this.slice;
-    const anchor = { chrom: p.chrom, pos: +p.pos };
+    // strand of the anchor gene, if a gene model's TSS sits exactly at the anchor
+    const anchorGene = this.genes.find((g) => (g.strand >= 0 ? g.start : g.end) === +p.pos);
+    const anchor = { chrom: p.chrom, pos: +p.pos, strand: anchorGene ? (anchorGene.strand >= 0 ? "+" as const : "-" as const) : null };
 
     const kept: number[] = [];
     rows.forEach((r, i) => { if (coverage(r) >= p.minCov) kept.push(i); });
@@ -208,7 +217,7 @@ export class Controller {
         if (next === this.rowOff) return false;
         this.rowOff = next; this.scheduleRedraw(); return true;
       },
-      onReset: () => { this.rowOff = 0; this.cb.onChange({ row_px: null }); void this.setView(this.anchorView()); },
+      onReset: () => this.reset(),
       onGeneClick: (g) => this.cb.onChange({ gene: g.name, pos: g.strand >= 0 ? g.start : g.end }),
     });
   }

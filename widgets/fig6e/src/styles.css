@@ -41,3 +41,10 @@
 .f6e-rowsbg { cursor: ns-resize; }
 .f6e-legitem { cursor: pointer; }
 .f6e-legitem:hover text { fill: #0d9488; }
+.f6e-right { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+.f6e-ucsc { font-size: 12px; color: #0d9488; text-decoration: none; white-space: nowrap; }
+.f6e-ucsc:hover { text-decoration: underline; }
+.f6e-reset { font: inherit; font-size: 14px; line-height: 1; width: 26px; height: 24px; padding: 0; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff; color: #334155; cursor: pointer; white-space: nowrap; }
+.f6e-reset:hover { background: #f1f5f9; border-color: #94a3b8; }
+.f6e-thr { transition: transform 140ms ease-out; }
+.f6e-tss { cursor: help; }
