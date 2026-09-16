@@ -364,19 +364,45 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
   svgEl("path", { d: trackPath(tracks.sum, sumMax, trackH), fill: ACCENT, opacity: 0.85, "pointer-events": "none" }, svg);
   // y axes for the two tracks: baseline at y0 + trackH - 2, full scale at y0 + 6
   const fmtSum = (v: number) => v >= 1000 ? `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k` : String(Math.round(v));
-  const trackAxis = (y0: number, title: string, fmt: (f: number) => string) => {   // ticks at 0, ½ and full scale
+  // Each axis also has a hover readout: while the pointer is over the figure the
+  // static tick labels give way to the value at the hovered bin, drawn at its height.
+  interface TrackAxis { show(b: number): void; hide(): void }
+  const trackAxis = (y0: number, title: string, arr: Float32Array, max: number, fmt: (f: number) => string): TrackAxis => {
     const g = svgEl("g", { "font-size": 8, fill: FG, "text-anchor": "end", "pointer-events": "none" }, svg);
     const yBase = y0 + trackH - 2, yTop = y0 + 6;
+    const yOf = (f: number) => yBase - f * (yBase - yTop);
     svgEl("line", { x1: heatX - 0.5, y1: yTop, x2: heatX - 0.5, y2: yBase, stroke: FG, "stroke-width": 0.8 }, g);
+    const staticG = svgEl("g", {}, g);
     for (const f of [0, 0.5, 1]) {
-      const yy = yBase - f * (yBase - yTop);
-      svgEl("line", { x1: heatX - 3, y1: yy, x2: heatX, y2: yy, stroke: FG, "stroke-width": 0.8 }, g);
-      svgEl("text", { x: heatX - 5, y: yy, "dominant-baseline": f === 0 ? "auto" : f === 1 ? "hanging" : "middle" }, g).textContent = fmt(f);
+      svgEl("line", { x1: heatX - 3, y1: yOf(f), x2: heatX, y2: yOf(f), stroke: FG, "stroke-width": 0.8 }, staticG);
+      svgEl("text", { x: heatX - 5, y: yOf(f), "dominant-baseline": f === 0 ? "auto" : f === 1 ? "hanging" : "middle" }, staticG).textContent = fmt(f);
     }
     svgEl("text", { x: heatX - 34, y: (yBase + yTop) / 2, "dominant-baseline": "middle", "font-size": 9, fill: DIM }, g).textContent = title;
+    // hover readout: tick + value on the axis, dot on the curve, guide down to the baseline
+    const hov = svgEl("g", { visibility: "hidden" }, g);
+    const hTick = svgEl("line", { x1: heatX - 4, x2: heatX, stroke: FG, "stroke-width": 1 }, hov);
+    const hText = svgEl("text", { x: heatX - 5, "dominant-baseline": "middle", "font-weight": 600 }, hov);
+    const hGuide = svgEl("line", { stroke: FG, "stroke-width": 0.6, opacity: 0.5 }, hov);
+    const hDot = svgEl("circle", { r: 2.2, fill: FG, stroke: "#fff", "stroke-width": 1 }, hov);
+    return {
+      show(b: number) {
+        const f = Math.max(0, Math.min(1, arr[b] / max)), yy = yOf(f), xx = tx(b) + (heatW / n) / 2;
+        for (const el of [hTick, hGuide]) { el.setAttribute("y1", String(yy)); }
+        hTick.setAttribute("y2", String(yy));
+        hGuide.setAttribute("x1", String(xx)); hGuide.setAttribute("x2", String(xx)); hGuide.setAttribute("y2", String(yBase));
+        hDot.setAttribute("cx", String(xx)); hDot.setAttribute("cy", String(yy));
+        // keep the label inside the track band
+        hText.setAttribute("y", String(Math.max(yTop + 3, Math.min(yBase - 3, yy))));
+        hText.textContent = fmt(f);
+        staticG.setAttribute("visibility", "hidden"); hov.setAttribute("visibility", "visible");
+      },
+      hide() { staticG.setAttribute("visibility", "visible"); hov.setAttribute("visibility", "hidden"); },
+    };
   };
-  trackAxis(0, "Coverage", (f) => `${Math.round(f * 100)}%`);   // share of kept species aligned
-  trackAxis(trackH, "Σ GPS", (f) => fmtSum(f * sumMax));   // summed GPS across kept species, absolute
+  const covAxis = trackAxis(0, "Coverage", tracks.cov, 1, (f) => `${Math.round(f * 100)}%`);   // share of kept species aligned
+  const sumAxis = trackAxis(trackH, "Σ GPS", tracks.sum, sumMax, (f) => fmtSum(f * sumMax));    // summed GPS across kept species, absolute
+  const showTrackValues = (b: number) => { covAxis.show(b); sumAxis.show(b); };
+  const hideTrackValues = () => { covAxis.hide(); sumAxis.hide(); };
 
   // gene track
   const gg = svgEl("g", { "font-size": 9, fill: FG }, svg);
@@ -454,7 +480,7 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
     tip.style.left = `${Math.min(ev.clientX - b.left + 12, width - 230)}px`;
     tip.style.top = `${ev.clientY - b.top + 12}px`;
   };
-  const hideTip = () => { tip.hidden = true; setHoverRow(null); cb.onHover?.(null); };
+  const hideTip = () => { tip.hidden = true; setHoverRow(null); hideTrackValues(); cb.onHover?.(null); };
 
   // --- pan by drag: the drag itself is tracked by index.js (it outlives redraws)
   canvas.addEventListener("mousedown", (ev) => { cb.onPanStart?.(ev.clientX, ev.clientY); ev.preventDefault(); });
@@ -465,6 +491,7 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
     const ri = order[r], val = slice.rows[ri][b];
     const bp = slice.startBp + b * slice.binBp;
     setHoverRow(r);
+    showTrackValues(b);
     showTip(ev, `<b>${abbreviate(slice.species[ri])}</b><br>${anchor.chrom}:${bp.toLocaleString()}<br>GPS ${val === MISSING ? "—" : (val / 4).toFixed(2)}`);
     cb.onHover?.({ species: slice.species[ri], bp, gps: val === MISSING ? null : val / 4 });
   });
@@ -521,6 +548,7 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
     if (ev.buttons) return;
     const bp = bpAt(ev.clientX - svg.getBoundingClientRect().left), bi = Math.floor((bp - slice.startBp) / slice.binBp);
     if (bi < 0 || bi >= n) return;
+    showTrackValues(bi);
     showTip(ev, `${anchor.chrom}:${Math.round(bp).toLocaleString()}<br>coverage ${(tracks.cov[bi] * 100).toFixed(0)}% · summed GPS ${tracks.sum[bi].toFixed(0)}<br><span class="f6e-hint">drag to zoom</span>`);
   });
 
