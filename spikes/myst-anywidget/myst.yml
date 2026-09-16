@@ -1,0 +1,5 @@
+version: 1
+project:
+  title: anywidget spike
+site:
+  template: book-theme

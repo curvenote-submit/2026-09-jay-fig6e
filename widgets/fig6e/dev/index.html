@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>fig6e widget dev</title>
+  <link rel="stylesheet" href="../src/styles.css" />
+  <style>body { margin: 0; padding: 24px; background: #fff; } #w { max-width: 1100px; }</style>
+</head>
+<body>
+  <div id="w"></div>
+  <script type="module">
+    import widget from "../dist/index.js";
+    function createMockModel(initial) {
+      const state = { ...initial }, listeners = {};
+      return {
+        get: (k) => state[k],
+        set(k, v) { const old = state[k]; state[k] = v; if (old !== v) (listeners[`change:${k}`] || []).forEach((cb) => cb()); },
+        save_changes() { throw new Error("MystAnyModel.save_changes not implemented yet."); }, // mimic MyST
+        on(ev, cb) { (listeners[ev] ||= []).push(cb); },
+        off(ev, cb) { listeners[ev] = (listeners[ev] || []).filter((f) => f !== cb); },
+        send(m) { console.log("send", m); },
+        _state: state,
+      };
+    }
+    const model = createMockModel({ data_url: "/data" });
+    globalThis.model = model;
+    widget.render({ model, el: document.getElementById("w") });
+  </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# See https://mystmd.org/guide/frontmatter
+version: 1
+project:
+  title: STEAM-v1 interactive figures
+  description: Interactive companion to Qiu, Daza, Welsh et al., "Evolutionary transfer learning enables organism-wide inference of mammalian enhancer landscapes"
+  keywords: [STEAM, Zoonomia, enhancers, chromatin accessibility, anywidget]
+  github: rowanc1/2026-09-interactive
+  toc:
+    - file: index.md
+    - file: fig6e.md
+site:
+  template: book-theme
+  options:
+    folders: true

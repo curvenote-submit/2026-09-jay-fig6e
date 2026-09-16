@@ -1,0 +1,23 @@
+{
+  "name": "steam-fig6e-widget",
+  "version": "0.0.1",
+  "description": "anywidget: STEAM-v1 cross-species enhancer view (Fig 6e), zarr-backed",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --format=esm --external:numcodecs/* --outfile=dist/index.js --minify --sourcemap && cp src/styles.css dist/styles.css",
+    "watch": "esbuild src/index.ts --bundle --format=esm --external:numcodecs/* --outfile=dist/index.js --sourcemap --watch",
+    "typecheck": "tsc --noEmit -p .",
+    "dev": "node dev/serve.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "d3-scale-chromatic": "^3.1.0",
+    "zarrita": "^0.7.5"
+  },
+  "devDependencies": {
+    "@types/d3-scale-chromatic": "^3.1.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^7.0.2"
+  }
+}

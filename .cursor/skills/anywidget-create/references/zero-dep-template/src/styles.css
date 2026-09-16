@@ -1,0 +1,15 @@
+/*
+ * Scope all rules to the widget's root class to avoid leaking into the host page.
+ * Replace "my-widget" with the class name added in render().
+ */
+
+.my-widget {
+  font-family: system-ui, sans-serif;
+  position: relative;
+  display: inline-block;
+}
+
+.my-widget .mw-display {
+  padding: 1rem;
+  font-size: 1.25rem;
+}

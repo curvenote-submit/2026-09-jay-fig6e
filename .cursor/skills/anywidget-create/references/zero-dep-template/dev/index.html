@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Widget Dev Harness</title>
+  <link rel="stylesheet" href="../src/styles.css" />
+</head>
+<body style="font-family: system-ui, sans-serif; padding: 2rem; max-width: 800px; margin: 0 auto;">
+  <h1>Widget Dev Harness</h1>
+  <div id="widget"></div>
+
+  <script type="module">
+    import * as widget from "../src/index.js";
+
+    // Mock model — mimics the anywidget model interface.
+    // Reuse this for any zero-dep widget; just change initialState.
+    function createMockModel(initialState) {
+      const state = { ...initialState };
+      const listeners = {};
+      return {
+        get(key) { return state[key]; },
+        set(key, value) { state[key] = value; },
+        save_changes() {},
+        on(key, cb) { (listeners[key] ||= []).push(cb); },
+        off(key, cb) {
+          listeners[key] = (listeners[key] || []).filter(fn => fn !== cb);
+        },
+        // Helper for manual testing in the console: model._fire("value")
+        _fire(key) { (listeners[key] || []).forEach(cb => cb()); },
+        send(msg) { console.log("send:", msg); },
+      };
+    }
+
+    // --- Set up the widget ---
+    // Replace the initial state with your widget's model keys and test values.
+
+    const model = createMockModel({ value: "Hello, Widget!" });
+    const el = document.getElementById("widget");
+
+    if (widget.initialize) widget.initialize({ model, el });
+    widget.render({ model, el });
+
+    // Expose model globally so you can test from the browser console:
+    //   model.set("value", "Updated!"); model._fire("value");
+    globalThis.model = model;
+  </script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "name": "anywidget-create-vanilla",
+      "source": "curvenote-skills-internal",
+      "sourcePath": "/Users/rowan/.skillup/cache/curvenote-skills-internal/anywidget-create",
+      "installedAt": "2026-09-15T21:08:25.186Z",
+      "symlink": false
+    },
+    {
+      "name": "mystmd-site",
+      "source": "curvenote-skills-internal",
+      "sourcePath": "/Users/rowan/.skillup/cache/curvenote-skills-internal/mystmd-site",
+      "installedAt": "2026-09-15T21:08:25.187Z",
+      "symlink": false
+    }
+  ]
+}

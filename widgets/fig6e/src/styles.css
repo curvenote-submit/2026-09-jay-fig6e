@@ -1,0 +1,43 @@
+/* Figure-specific styles (canvas, SVG overlay, tooltip). Controls and tiles are
+   Tailwind/shadcn — see tw.css. Scoped to .f6e: MyST mounts widgets in a shadow
+   root, JupyterLab does not. */
+.f6e { font: 13px/1.4 -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; color: #334155; max-width: 100%; }
+.f6e * { box-sizing: border-box; }
+.f6e-head { margin-bottom: 8px; }
+.f6e-title { font-weight: 600; font-size: 15px; }
+.f6e-sub { color: #64748b; font-size: 12px; }
+.f6e-controls { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; padding: 8px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; }
+.f6e-controls label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 12px; }
+.f6e-controls input[type=range] { width: 110px; accent-color: #0d9488; }
+.f6e-select, .f6e-geneinput, .f6e-num { font: inherit; font-size: 12px; padding: 2px 6px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff; color: inherit; }
+.f6e-geneinput { width: 9em; text-transform: uppercase; }
+.f6e-num { width: 4em; }
+.f6e-val { min-width: 2.6em; font-variant-numeric: tabular-nums; font-size: 12px; }
+.f6e-status { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 10px 0; }
+.f6e-tile { border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 10px; background: #fff; }
+.f6e-tv { font-size: 20px; font-weight: 600; line-height: 1.1; }
+.f6e-tl { font-size: 12px; color: #475569; }
+.f6e-ts { font-size: 11px; color: #94a3b8; }
+.f6e-msg { min-height: 1.2em; font-size: 12px; color: #64748b; }
+.f6e-err { color: #dc2626; }
+.f6e-hint-bar { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+.f6e-figure { position: relative; width: 100%; }
+.f6e-fig { position: relative; width: 100%; overflow: hidden; }
+.f6e-heat { position: absolute; image-rendering: pixelated; cursor: crosshair; }
+.f6e-svg { position: absolute; left: 0; top: 0; pointer-events: none; }
+.f6e-svg g, .f6e-call { pointer-events: auto; }
+.f6e-tip { position: absolute; pointer-events: none; background: rgba(15, 23, 42, 0.92); color: #f8fafc; padding: 6px 8px; border-radius: 4px; font-size: 11px; line-height: 1.35; z-index: 10; max-width: 220px; }
+.f6e-empty { padding: 24px; color: #64748b; text-align: center; border: 1px dashed #cbd5e1; border-radius: 6px; }
+.f6e-hint { color: #cbd5e1; }
+.f6e-heat { cursor: grab; }
+.f6e-panning .f6e-heat { cursor: grabbing; }
+.f6e-tiphit, .f6e-gene, .f6e-call { cursor: pointer; }
+.f6e-brusharea { cursor: col-resize; }
+.f6e-zoom { position: absolute; display: flex; gap: 2px; z-index: 5; }
+.f6e-zoom button { width: 22px; height: 20px; padding: 0; font: 12px/1 inherit; border: 1px solid #cbd5e1; background: #fff; color: #334155; border-radius: 3px; cursor: pointer; }
+.f6e-zoom button:hover { background: #f1f5f9; }
+.f6e-gapswatch { cursor: pointer; }
+.f6e-gapswatch:hover text { fill: #0d9488; }
+.f6e-rowsbg { cursor: ns-resize; }
+.f6e-legitem { cursor: pointer; }
+.f6e-legitem:hover text { fill: #0d9488; }
