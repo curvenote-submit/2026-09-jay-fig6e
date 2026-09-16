@@ -353,13 +353,14 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
 
   // colourbar (top-left, where the matplotlib figure keeps its legend)
   {
-    const cbX = CB_X, cbY = CB_Y, cbW = Math.min(260, heatX - 56 - cbX), cbH = CB_H;
+    // stop well short of the track-axis titles ("Coverage" etc. end at heatX - 34)
+    const cbX = CB_X, cbY = CB_Y, cbW = Math.min(260, heatX - 92 - cbX), cbH = CB_H;
     const defs = svgEl("defs", {}, svg);
     const gradId = `f6e-viridis-${Math.random().toString(36).slice(2, 8)}`;
     const grad = svgEl("linearGradient", { id: gradId, x1: 0, x2: 1, y1: 0, y2: 0 }, defs);
     for (let i = 0; i <= 16; i++) svgEl("stop", { offset: `${(i / 16) * 100}%`, "stop-color": interpolateViridis(i / 16) }, grad);
     const g = svgEl("g", { "font-size": 9, fill: FG }, svg);
-    svgEl("text", { x: cbX, y: cbY - 4 }, g).textContent = "STEAM-v1 GPS (genome-wide Phred)";
+    svgEl("text", { x: cbX, y: cbY - 4 }, g).textContent = cbW >= 170 ? "STEAM-v1 GPS (genome-wide Phred)" : "STEAM-v1 GPS";   // shorter in narrow columns
     svgEl("rect", { x: cbX, y: cbY, width: cbW, height: cbH, fill: `url(#${gradId})`, stroke: FAINT }, g);
     for (const t of [0, 10, 20, 30]) {
       const tx = cbX + (t / VMAX) * cbW;

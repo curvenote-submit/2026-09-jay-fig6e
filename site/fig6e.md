@@ -26,14 +26,15 @@ server. The `GPS ≥`, `Groups` and `Min cov` controls recompute in the browser
 without refetching; changing the gene, cell class or window fetches a new slice
 (a few hundred KB).
 
-Interactions: **drag** the heatmap to pan along the chromosome (new chunks
-stream in as you go), **drag on the coverage/sum tracks** to zoom to a region,
-**ctrl + wheel** (or pinch) over the heatmap to zoom at the cursor, **pinch over
-the species column** to make rows taller — the figure keeps its height and you
-scroll or drag vertically through the species — **double-click** to reset, **click a
-species** in the tree column to highlight it, **click a gene** to recentre on
-its TSS, and **click a synteny-group swatch** in the legend to isolate that
-group.
+Interactions: **drag or scroll sideways** on the heatmap to pan along the
+chromosome (new chunks stream in as you go), **drag on the coverage/sum tracks**
+or **pinch the heatmap** to zoom, **pinch the species column** to make rows
+taller and scroll through the species, **hover** a species, gene, enhancer or
+synteny group for details (species and gene cards come from Wikipedia and
+MyGene.info), **click a species** to highlight it, **click a gene** to recentre
+on its TSS, **click a synteny group** (in the enhancer panel or the Synteny
+Groups track) to isolate it, and use the buttons in the controls bar to open
+the window in UCSC, download the calls or group summary as TSV, or reset.
 :::
 
 ## How this compares to the published panel
