@@ -482,7 +482,7 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
   if (groupsH) {
     const gy = trackH * 2 + GROUPS_H / 2 + 1;        // Groups row directly under the Σ GPS track
     const grg = svgEl("g", { "font-size": 8, class: "f6e-groups" }, svg);
-    svgEl("text", { x: heatX - 34, y: gy, "text-anchor": "end", "dominant-baseline": "middle", "font-size": 9, fill: DIM, "pointer-events": "none" }, grg).textContent = "Groups";
+    svgEl("text", { x: heatX - 34, y: gy, "text-anchor": "end", "dominant-baseline": "middle", "font-size": 9, fill: DIM, "pointer-events": "none" }, grg).textContent = "Synteny Groups";
     svgEl("line", { x1: heatX, y1: gy, x2: heatX + heatW, y2: gy, stroke: FAINT, "pointer-events": "none" }, grg);
     const maxSp = Math.max(1, ...(v.summary ?? []).map((g) => g.n_species));
     for (const g of v.summary ?? []) {
@@ -514,6 +514,26 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
     .textContent = "Enhancers (Synteny Group)";
   svgEl("text", { x: heatX + heatW, y: totalH - 2, "text-anchor": "end", "font-size": 9, fill: DIM }, ax)
     .textContent = `${anchor.chrom}:${slice.startBp.toLocaleString()}–${slice.endBp.toLocaleString()} (${fmtKb(span)}), hg38`;
+
+  // inset shadows at the top / bottom of the row viewport while more rows lie
+  // beyond it in that direction — the cue that the species can be scrolled
+  if (maxOff > 0) {
+    const defs = svgEl("defs", {}, svg);
+    const shade = (id: string, down: boolean) => {
+      const gr = svgEl("linearGradient", { id, x1: 0, x2: 0, y1: down ? 0 : 1, y2: down ? 1 : 0 }, defs);
+      svgEl("stop", { offset: "0%", "stop-color": "#0f172a", "stop-opacity": 0.28 }, gr);
+      svgEl("stop", { offset: "100%", "stop-color": "#0f172a", "stop-opacity": 0 }, gr);
+    };
+    const uid = Math.random().toString(36).slice(2, 8), shH = 12, shW = heatX + heatW;
+    if (off > 0.5) {
+      shade(`f6e-sh-top-${uid}`, true);
+      svgEl("rect", { x: 0, y: top, width: shW, height: shH, fill: `url(#f6e-sh-top-${uid})`, "pointer-events": "none" }, svg);
+    }
+    if (off < maxOff - 0.5) {
+      shade(`f6e-sh-bot-${uid}`, false);
+      svgEl("rect", { x: 0, y: top + heatH - shH, width: shW, height: shH, fill: `url(#f6e-sh-bot-${uid})`, "pointer-events": "none" }, svg);
+    }
+  }
 
   // row scrollbar (only when rows overflow the viewport)
   if (maxOff > 0) {

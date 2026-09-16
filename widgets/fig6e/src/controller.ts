@@ -8,7 +8,7 @@ import { DataSource } from "./data";
 import { buildTree } from "./tree";
 import { callEnhancers, assignSyntenyGroups, coverage, columnTracks } from "./compute";
 import { drawFigure, fmtBp, type FigureHandle } from "./draw";
-import type { Call, Gene, Params, Slice, Status, StoreMeta, View } from "./types";
+import type { Call, Gene, GroupSummary, Params, Slice, Status, StoreMeta, View } from "./types";
 
 export const MIN_SPAN = 2_000, MAX_SPAN = 4_000_000;   // bp; 4 Mb = ~20 chunks, ~10 MB decoded
 export const ROW_PX_MAX = 24;
@@ -37,6 +37,10 @@ export class Controller {
   slice: Slice | null = null;
   view: View | null = null;
   rowOff = 0;
+  /** Where the isolated group is, in bp. Group *ranks* are recomputed for every
+   *  window, so the selection is anchored to a position and re-resolved on redraw. */
+  selectedPos: number | null = null;
+  private selectionParked = false;   // the remembered group is off-screen; rank is null but the position is kept
   figure: FigureHandle | null = null;
   calls: Call[] = [];
 
@@ -169,7 +173,7 @@ export class Controller {
     calls.forEach((c) => { c.row = idx.get(c.species)!; });
     const summary = assignSyntenyGroups(calls, p.nMajor);
     const groupSpans = new Map(summary.map((s) => [s.group, s]));
-    const selectedGroup = p.selectedGroup != null && groupSpans.has(p.selectedGroup) ? p.selectedGroup : null;
+    const selectedGroup = this.resolveSelection(p.selectedGroup, summary, anchor.pos);
     const tracks = columnTracks(kRows);
     this.calls = calls;
 
@@ -197,7 +201,12 @@ export class Controller {
         if (i >= 0) hl.splice(i, 1); else hl.push(sp);
         this.cb.onChange({ highlight: hl });
       },
-      onSelectGroup: (g) => this.cb.onChange({ selected_group: g }),
+      onSelectGroup: (g) => {
+        const gs = g != null ? summary.find((s) => s.group === g) : undefined;
+        this.selectedPos = gs ? anchor.pos + gs.mean_dist_to_tss : null;
+        this.selectionParked = false;
+        this.cb.onChange({ selected_group: g });
+      },
       onToggleGaps: () => this.cb.onChange({ show_gaps: !p.showGaps }),
       onBrushStart: (clientX) => { this.brush = { x0: clientX, x1: clientX }; },
       onPanStart: (clientX, clientY) => { this.drag = { x: clientX, y: clientY, moved: false }; this.host.classList.add("f6e-panning"); },
@@ -222,6 +231,38 @@ export class Controller {
       onReset: () => this.reset(),
       onGeneClick: (g) => this.cb.onChange({ gene: g.name, pos: g.strand >= 0 ? g.start : g.end }),
     });
+  }
+
+  /**
+   * Turn the model's selected rank into the rank of the group at the remembered
+   * position. A fresh host-side selection adopts its group's position; a
+   * remembered position picks the group whose span covers it (or the nearest
+   * mean within a small tolerance); nothing nearby -> no isolation, but the
+   * position is kept so panning back restores it.
+   */
+  private resolveSelection(rank: number | null, summary: GroupSummary[], anchorPos: number): number | null {
+    const at = (g: GroupSummary) => anchorPos + g.mean_dist_to_tss;
+    if (this.selectedPos == null) {
+      if (rank == null) return null;
+      const g = summary.find((s) => s.group === rank);          // host-side selection: adopt its position
+      if (!g) return null;
+      this.selectedPos = at(g);
+      return rank;
+    }
+    if (rank == null && !this.selectionParked) { this.selectedPos = null; return null; }   // explicit clear
+    const pos = this.selectedPos, span = this.view ? this.view.endBp - this.view.startBp : 0;
+    const tol = Math.max(2_000, span * 0.02);
+    const near = summary
+      .filter((g) => g.start - tol <= pos && pos <= g.end + tol)
+      .sort((a, b) => Math.abs(at(a) - pos) - Math.abs(at(b) - pos))[0];
+    if (near) {
+      this.selectionParked = false;
+      if (near.group !== rank) this.cb.onChange({ selected_group: near.group });   // keep the model's rank in step
+      return near.group;
+    }
+    this.selectionParked = true;
+    if (rank != null) this.cb.onChange({ selected_group: null });
+    return null;
   }
 
   // --- window-level drag handling (outlives per-tick redraws) -------------------
