@@ -510,9 +510,39 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
     svgEl("line", { x1: x(t), y1: top + heatH, x2: x(t), y2: top + heatH + 4, stroke: FG }, ax);
     svgEl("text", { x: x(t), y: top + heatH + 15, "text-anchor": "middle" }, ax).textContent = fmtKb(t);
   }
-  // x-axis title for the calls panel
-  svgEl("text", { x: treeW + labelW + gap + callsW / 2, y: top + heatH + 15, "text-anchor": "middle", "font-size": 9, fill: FG }, ax)
-    .textContent = "Enhancers (Synteny Group)";
+  // x-axis title for the species column: how many made the coverage cut, and why the rest are hidden
+  {
+    const total = slice.species.length, hidden = total - nRows;
+    const t = svgEl("text", { x: (treeW + labelW) / 2, y: top + heatH + 15, "text-anchor": "middle", "font-size": 9, fill: FG, class: "f6e-sptitle" }, ax);
+    t.textContent = `Species (${nRows} of ${total})`;
+    const pct = Math.round(params.minCov * 100);
+    const why = hidden
+      ? `<div class="f6e-tip-title">${nRows} of ${total} species shown</div>` +
+        `<div>${hidden} hidden: less than ${pct}% of their hg38-projected track is aligned in this window (the <b>Min cov</b> control). ` +
+        `Projection onto hg38 is patchy, so coverage stands in for the paper's ≥50 kb-per-flank rule.</div>` +
+        `<div class="f6e-tip-extract">Lower Min cov to show more species; raise it to keep only well-aligned ones. Zooming changes the window, and so the count.</div>`
+      : `<div class="f6e-tip-title">All ${total} species shown</div><div>Every species clears the ${pct}% coverage filter in this window.</div>`;
+    t.addEventListener("mousemove", (ev) => showTip(ev, why, true));
+    t.addEventListener("mouseleave", () => { tip.hidden = true; });
+  }
+
+  // x-axis title for the calls panel: count, and how the GPS cutoff and grouping work
+  {
+    const nMajorShown = v.summary?.length ?? 0;
+    const inMajor = calls.filter((c) => (c.group ?? 0) > 0).length;
+    const t = svgEl("text", { x: callsX0 + callsW / 2, y: top + heatH + 15, "text-anchor": "middle", "font-size": 9, fill: FG, class: "f6e-sptitle" }, ax);
+    t.textContent = `Enhancers (${calls.length.toLocaleString()}, Synteny Group)`;
+    const why =
+      `<div class="f6e-tip-title">${calls.length.toLocaleString()} enhancers called in ${nRows} species</div>` +
+      `<div>A call is a run of 100 bp bins with <b>GPS ≥ ${params.threshold}</b> — the paper's genome-wide Phred score of predicted accessibility; ` +
+      `24.5 is the paper's threshold, calibrated on the mouse genome. Each bar is one call, coloured by synteny group.</div>` +
+      `<div class="f6e-tip-extract">Calls that overlap across species are linked into a synteny group; the ${nMajorShown} largest are numbered and coloured, ` +
+      `the rest are grey "minor" groups (${calls.length ? Math.round((100 * inMajor) / calls.length) : 0}% of calls are in numbered groups).</div>` +
+      `<div class="f6e-tip-extract">Drag <b>GPS ≥</b> to test how robust the picture is to the cutoff — lower calls more, weaker enhancers; higher keeps only the strongest. ` +
+      `<b>Groups</b> sets how many groups get a colour.</div>`;
+    t.addEventListener("mousemove", (ev) => showTip(ev, why, true));
+    t.addEventListener("mouseleave", () => { tip.hidden = true; });
+  }
   svgEl("text", { x: heatX + heatW, y: totalH - 2, "text-anchor": "end", "font-size": 9, fill: DIM }, ax)
     .textContent = `${anchor.chrom}:${slice.startBp.toLocaleString()}–${slice.endBp.toLocaleString()} (${fmtKb(span)}), hg38`;
 

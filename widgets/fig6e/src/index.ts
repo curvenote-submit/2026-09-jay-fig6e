@@ -87,6 +87,21 @@ export function render({ model, el }: { model: AnyModel; el: HTMLElement }): () 
   resetBtn.innerHTML = ICON.reset;
   const ucsc = h("a", { class: "f6e-ucsc", target: "_blank", rel: "noopener", title: "Open the current window in the UCSC Genome Browser (hg38)" }, "UCSC ");
   ucsc.insertAdjacentHTML("beforeend", ICON.external);
+  const dlCalls = h("button", { type: "button", class: "f6e-iconbtn", title: "Download the enhancer calls in this window as TSV (one row per call, with its synteny group)" });
+  dlCalls.innerHTML = ICON.download;
+  const dlGroups = h("button", { type: "button", class: "f6e-iconbtn", title: "Download the synteny-group summary as TSV (enhancers, species, mean distance, mean GPS, span per group)" });
+  dlGroups.innerHTML = ICON.table;
+  const download = (text: string, name: string) => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "text/tab-separated-values" }));
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  const stem = () => {
+    const v = ctl.view;
+    return `${get("gene") || get("chrom")}_${get("cell_type")}_${get("chrom")}_${v ? `${v.startBp}-${v.endBp}` : "view"}_gps${get("threshold")}`;
+  };
   const updateUcsc = () => {
     const v = ctl.view;
     if (!v) return;
@@ -105,7 +120,7 @@ export function render({ model, el }: { model: AnyModel; el: HTMLElement }): () 
       h("label", {}, "GPS ≥ ", thr, thrV),
       h("label", {}, "Groups ", nMaj),
       h("label", {}, "Min cov ", cov, covV),
-      h("span", { class: "f6e-right" }, ucsc, resetBtn)),
+      h("span", { class: "f6e-right" }, ucsc, dlCalls, dlGroups, resetBtn)),
     status, msg, figure,
     h("div", { class: "f6e-hint-bar" },
       "drag or scroll sideways on the heatmap to pan · drag on the tracks or pinch the heatmap to zoom · pinch the species column to resize rows, then scroll or drag vertically · Reset (or double-click) to go back · click a species, a gene, a synteny group, or the “no alignment” swatch"),
@@ -177,6 +192,8 @@ export function render({ model, el }: { model: AnyModel; el: HTMLElement }): () 
     void ctl.geneSymbols().then((syms) => geneList.append(...syms.map((s) => h("option", { value: s }))));
   });
   resetBtn.addEventListener("click", () => ctl.reset());
+  dlCalls.addEventListener("click", () => download(ctl.callsTsv(), `enhancer_calls_${stem()}.tsv`));
+  dlGroups.addEventListener("click", () => download(ctl.groupsTsv(), `synteny_groups_${stem()}.tsv`));
   ctSel.addEventListener("change", () => { set({ cell_type: ctSel.value }); push(); });
   winSel.addEventListener("change", () => { set({ window_kb: +winSel.value, start: null, end: null }); push(); });
   thr.addEventListener("input", () => { thrV.textContent = (+thr.value).toFixed(1); set({ threshold: +thr.value }); push(); });

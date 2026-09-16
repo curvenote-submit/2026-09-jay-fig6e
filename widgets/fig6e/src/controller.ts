@@ -43,6 +43,7 @@ export class Controller {
   private selectionParked = false;   // the remembered group is off-screen; rank is null but the position is kept
   figure: FigureHandle | null = null;
   calls: Call[] = [];
+  summary: GroupSummary[] = [];
 
   private drag: { x: number; y: number; moved: boolean } | null = null;
   private brush: { x0: number; x1: number } | null = null;
@@ -177,6 +178,7 @@ export class Controller {
     const selectedGroup = this.resolveSelection(p.selectedGroup, summary, anchor.pos);
     const tracks = columnTracks(kRows);
     this.calls = calls;
+    this.summary = summary;
 
     const inMajor = calls.filter((c) => (c.group ?? 0) > 0).length;
     const sl = this.slice;
@@ -242,6 +244,20 @@ export class Controller {
       },
       onGeneClick: (g) => this.cb.onChange({ gene: g.name, pos: g.strand >= 0 ? g.start : g.end }),
     });
+  }
+
+  /** TSV of the current enhancer calls (the Streamlit app's "Download calls"). */
+  callsTsv(): string {
+    const cols = ["species", "chrom", "start", "end", "length_bp", "gps_max", "gps_mean", "dist_to_tss", "group"];
+    const rows = this.calls.map((c) => [c.species, this.p!.chrom, c.start, c.end, c.end - c.start, c.gps_max.toFixed(2), c.gps_mean.toFixed(2), c.dist_to_tss, c.group ?? 0]);
+    return [cols, ...rows].map((r) => r.join("\t")).join("\n") + "\n";
+  }
+
+  /** TSV of the per-group summary (the Fig 6d statistics). */
+  groupsTsv(): string {
+    const cols = ["group", "n_enhancers", "n_species", "mean_dist_to_tss", "mean_gps", "chrom", "start", "end", "span_bp"];
+    const rows = this.summary.map((g) => [g.group, g.n_enhancers, g.n_species, Math.round(g.mean_dist_to_tss), g.mean_gps.toFixed(2), this.p!.chrom, g.start, g.end, g.end - g.start]);
+    return [cols, ...rows].map((r) => r.join("\t")).join("\n") + "\n";
   }
 
   /**
