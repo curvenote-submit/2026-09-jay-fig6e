@@ -575,7 +575,25 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
   };
   rowsG.addEventListener("wheel", rowWheel, { passive: false });
 
-  // calls
+  // calls: structured card with the group swatch and a key/value grid
+  const callCard = (c: Call) => {
+    const grp = c.group ? `Group ${c.group}` : "Minor group";
+    const g = v.groupSpans?.get(c.group ?? 0);
+    const d = c.dist_to_tss;
+    const side = anchor.strand
+      ? ((d < 0) === (anchor.strand === "+") ? "upstream" : "downstream")   // relative to transcription
+      : (d < 0 ? "left" : "right");
+    const dist = Math.abs(d) < 1000 ? `${Math.abs(d)} bp` : `${(Math.abs(d) / 1000).toFixed(1)} kb`;
+    const row = (k: string, val: string) => `<div class="f6e-kv-k">${k}</div><div class="f6e-kv-v">${val}</div>`;
+    return `<div class="f6e-tip-title"><span class="f6e-tip-sw" style="background:${groupColor(c.group ?? 0, params.nMajor)}"></span>` +
+      `${esc(abbreviate(c.species))}<span class="f6e-tip-dim"> · ${grp}${g ? ` (${g.n_species} species)` : ""}</span></div>` +
+      `<div class="f6e-kv">` +
+      row("Position", `${esc(anchor.chrom)}:${c.start.toLocaleString()}–${c.end.toLocaleString()}`) +
+      row("Length", `${(c.end - c.start).toLocaleString()} bp`) +
+      row("GPS", `peak <b>${c.gps_max.toFixed(1)}</b> · mean ${c.gps_mean.toFixed(1)}`) +
+      row("From TSS", `${dist} ${side}`) +
+      `</div>`;
+  };
   cg.addEventListener("mousemove", (ev) => {
     const px = ev.clientX - svg.getBoundingClientRect().left;
     const bp = slice.startBp + ((px - callsX0) / callsW) * span;
@@ -584,7 +602,7 @@ export function drawFigure(root: HTMLElement, v: FigureView, cb: FigureCallbacks
     const c = (ev.target as HitRect)._call;
     if (!c) { tip.hidden = true; setHoverRow(null); return; }
     setHoverRow(v.rowPos.get(c.row) ?? null);
-    showTip(ev, `<b>${abbreviate(c.species)}</b> · group ${c.group || "minor"}<br>${anchor.chrom}:${c.start.toLocaleString()}–${c.end.toLocaleString()}<br>peak GPS ${c.gps_max.toFixed(1)}, mean ${c.gps_mean.toFixed(1)}<br>${(c.dist_to_tss / 1000).toFixed(1)} kb from TSS`);
+    showTip(ev, callCard(c), true);
   });
 
   // tips: hover row + Wikipedia card, click toggles highlight
