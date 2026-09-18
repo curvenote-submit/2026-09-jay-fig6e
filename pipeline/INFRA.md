@@ -113,6 +113,27 @@ Manager instead of SSH.
 `DeleteObject` is needed so a re-run of a cell class can replace its chunks;
 scope stays inside the prefix.
 
+### How the instance reaches the bucket
+
+No keys are copied anywhere. The role is attached to the instance as an
+*instance profile*; EC2 then serves short-lived, auto-rotating credentials for
+it through the instance metadata service, and the AWS CLI (which
+`steam-zarr … --upload` shells out to as `aws s3 sync`) picks them up with no
+`aws configure` step. Two things to confirm with infra:
+
+- **Same account?** If `cn-scms-datastore` lives in a different AWS account
+  from the instance, the role policy alone is not enough: the bucket also needs
+  a bucket policy granting the role's ARN the same actions.
+- **Public read of the results.** The widget reads the store anonymously from a
+  web page, so the new objects under `csev-steam-1/data/` must be publicly
+  readable exactly like the existing ones there (bucket policy / Block Public
+  Access as already configured — with "bucket owner enforced" ownership, new
+  objects inherit it automatically).
+
+Fallback if a role cannot be granted: an IAM user with the same policy and an
+access key, set with `aws configure` on the instance — works identically but is
+a long-lived secret to delete afterwards.
+
 ## Text you can paste into the request
 
 > I need a Linux EC2 instance in us-east-1 for a one-off, ~1-day data
@@ -127,6 +148,9 @@ scope stays inside the prefix.
 >   `AmazonSSMManagedInstanceCore` so I can use Session Manager — no SSH key or
 >   inbound rule needed.
 > - Security group: outbound 443 only.
+> - The bucket is [in this account / in account X — please add a bucket
+>   policy for the role]. New objects written under `csev-steam-1/data/` must
+>   be publicly readable, like the existing ones there.
 > - Please tag `Project=csev-steam` and set a $100 budget alert; expected
 >   spend is about $20. I will terminate it when done (within 3 days).
 >
