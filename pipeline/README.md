@@ -110,12 +110,28 @@ them. Independent of the build; takes seconds.
 
 ### 4. Watch
 
+Run the build inside `tmux` so it survives a dropped SSH connection and you
+can reattach to the live log (`nohup … &` alone also survives the drop, but
+tmux lets you look):
+
 ```bash
-steam-zarr status --out /data/steam_v1_gps.zarr
-tail -f /data/build.log
+tmux new -s steam            # then run the build command; Ctrl-b d to detach
+tmux attach -t steam         # from any later ssh session
 ```
 
-`status` lists chromosomes done per cell class, Mb completed, and failures.
+Three ways to see progress, from most to least access required:
+
+```bash
+steam-zarr status --out /data/steam_v1_gps.zarr     # on the instance: table per cell class
+tail -f /data/build.log                             # on the instance: live log
+curl -s https://cn-scms-datastore.s3.us-east-1.amazonaws.com/csev-steam-1/data/status.json   # anywhere, no login
+```
+
+With `--upload`, the build writes `status.json` next to the store and copies it
+to the bucket **after every chromosome**: cell classes complete, chromosomes
+done per cell class, failures, the current cell class and chromosome, the
+current rate and the ETA for the cell class in progress. It is public like the
+rest of the data, so anyone can check it in a browser.
 
 ### 5. Verify, then finish
 

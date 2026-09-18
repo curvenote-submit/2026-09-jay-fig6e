@@ -70,6 +70,29 @@ def upload(out: Path, s3_prefix: str, what: str = '') -> None:
     log('upload ' + ('done' if r.returncode == 0 else f'FAILED (exit {r.returncode})'))
 
 
+def publish_status(out: Path, s3_prefix: str | None, extra: dict) -> None:
+    """Write status.json next to the store and, with --upload, copy it to the bucket
+    so progress can be read from a browser with no access to the instance."""
+    try:
+        root, grp = open_store(out, 'r')
+        sizes = grp.attrs['chrom_sizes']
+        cts = {}
+        for ct in core.CELL_TYPES:
+            if ct in grp:
+                done = grp[ct].attrs.get('chroms_done', [])
+                cts[ct] = {'chroms_done': len(done), 'chroms_total': len(sizes), 'complete': len(done) == len(sizes),
+                           'failures': sum(len(v) for v in grp[ct].attrs.get('failures', {}).values())}
+        status = {'updated': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+                  'cell_classes_complete': sum(c['complete'] for c in cts.values()),
+                  'cell_classes_total': len(core.CELL_TYPES), 'cell_classes': cts, **extra}
+        (out.parent / 'status.json').write_text(json.dumps(status, indent=1))
+        if s3_prefix and shutil.which('aws'):
+            subprocess.run(['aws', 's3', 'cp', str(out.parent / 'status.json'), s3_prefix.rstrip('/') + '/status.json',
+                            '--only-show-errors', '--content-type', 'application/json', '--cache-control', 'no-cache'])
+    except Exception as e:  # status is best-effort; never let it stop the build
+        log(f'status.json not written: {e!r}')
+
+
 # --- bench -------------------------------------------------------------------
 
 def cmd_bench(a) -> int:
@@ -175,6 +198,8 @@ def build_cell_type(a, cell_type: str, species: list[str], levels, qmap, sizes, 
         eta = (mb_total - mb_done) / rate / 3600 if rate else float('nan')
         log(f'{cell_type} {chrom}: wrote {nb:,} bins, {(block != core.MISSING).mean():.0%} non-missing, '
             f'{time.time() - t0:.0f}s{f", {len(errs)} species failed" if errs else ""} · {rate:.0f} Mb/s · ETA for this cell class {fmt_h(eta)}')
+        publish_status(out, a.upload, {'current': {'cell_class': cell_type, 'last_chrom': chrom, 'rate_mb_s': round(rate),
+                                                   'eta_this_cell_class_h': round(eta, 2)}})
     core.write_meta(out, dict(grp.attrs), grp.array_keys())
     log(f'{cell_type}: complete in {fmt_h((time.time() - t_ct) / 3600)}')
 
@@ -204,6 +229,7 @@ def cmd_build(a) -> int:
             upload(out, a.upload, what=ct)
         elapsed = (time.time() - t0) / 3600
         log(f'elapsed {fmt_h(elapsed)} · ETA for the remaining {len(cell_types) - k} cell class(es): {fmt_h(elapsed / k * (len(cell_types) - k))}')
+    publish_status(out, a.upload, {'current': None, 'finished': True})
     log('build finished')
     return 0
 
