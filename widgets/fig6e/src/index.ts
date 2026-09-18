@@ -95,6 +95,9 @@ export function render({ model, el }: { model: AnyModel; el: HTMLElement }): () 
   dlCalls.innerHTML = ICON.download;
   const dlGroups = h("button", { type: "button", class: "f6e-iconbtn", title: "Download the synteny-group summary as TSV (enhancers, species, mean distance, mean GPS, span per group)" });
   dlGroups.innerHTML = ICON.table;
+  const infoBtn = h("button", { type: "button", class: "f6e-iconbtn", title: "About the data: source, citation, and links to download the original bigwig files" });
+  infoBtn.innerHTML = ICON.info;
+  const infoPanel = h("div", { class: "f6e-info", hidden: "" });
   const download = (text: string, name: string) => {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([text], { type: "text/tab-separated-values" }));
@@ -124,8 +127,8 @@ export function render({ model, el }: { model: AnyModel; el: HTMLElement }): () 
       h("label", {}, "GPS ≥ ", thr, thrV),
       h("label", {}, "Groups ", nMaj),
       h("label", {}, "Min cov ", cov, covV),
-      h("span", { class: "f6e-right" }, ucsc, dlCalls, dlGroups, resetBtn)),
-    status, msg, figure,
+      h("span", { class: "f6e-right" }, ucsc, dlCalls, dlGroups, infoBtn, resetBtn)),
+    infoPanel, status, msg, figure,
     h("div", { class: "f6e-hint-bar" },
       "drag or scroll sideways on the heatmap to pan · drag on the tracks or pinch the heatmap to zoom · pinch the species column to resize rows, then scroll or drag vertically · Reset (or double-click) to go back · click a species, a gene, a synteny group, or the “no alignment” swatch"),
   );
@@ -149,6 +152,35 @@ export function render({ model, el }: { model: AnyModel; el: HTMLElement }): () 
     );
   };
 
+  /** The Data panel: provenance from meta.json plus download links for the originals. */
+  const DEFAULT_TEMPLATE = "https://shendure-web.gs.washington.edu/content/members/cxqiu/public/nobackup/jax_atac_augmented_241_mammals_hg38/hg38/{species}/{species}.{cell_type}.bw";
+  const renderInfo = () => {
+    if (infoPanel.hidden) return;
+    const prov = meta?.provenance ?? {};
+    const tmpl = prov.source_url_template ?? DEFAULT_TEMPLATE;
+    const ct = get("cell_type");
+    const mb = prov.source_bytes_per_track ? ` (≈ ${Math.round(prov.source_bytes_per_track / 1e6)} MB each)` : "";
+    const link = (href: string, text: string) => h("a", { href, target: "_blank", rel: "noopener" }, text);
+    const hl = get("highlight");
+    const perSpecies = hl.length
+      ? h("ul", { class: "f6e-info-list" }, ...hl.map((sp) =>
+          h("li", {}, link(tmpl.replace(/\{species\}/g, sp).replace("{cell_type}", ct), `${sp}.${ct}.bw`))))
+      : h("div", { class: "f6e-info-dim" }, "Click species in the tree column to highlight them; their bigwig files will be listed here.");
+    const storeUrl = `${ctl.ds.base}/steam_v1_gps.zarr/`;
+    infoPanel.replaceChildren(
+      h("div", { class: "f6e-info-title" }, prov.dataset ?? "STEAM-v1 predicted accessibility"),
+      prov.citation ? h("div", {}, prov.citation, prov.doi ? h("span", {}, " · ", link(`https://doi.org/${prov.doi}`, `doi:${prov.doi}`)) : "") : "",
+      h("div", { class: "f6e-info-h" }, "Original data (per-base bigWig, hg38-projected)", mb),
+      h("div", {}, link(prov.source_base ?? tmpl.replace(/\{species\}.*$/, ""), "Browse the source directory"), " — one folder per species, one file per cell class."),
+      h("div", { class: "f6e-info-h" }, `Highlighted species · ${ct.replaceAll("_", " ")}`),
+      perSpecies,
+      h("div", { class: "f6e-info-h" }, "This store (100 bp GPS bins, Zarr)"),
+      h("div", {}, h("code", {}, storeUrl), prov.retrieved ? ` · built ${prov.retrieved}` : "", prov.pipeline ? ` · ${prov.pipeline}` : ""),
+      prov.normalisation ? h("div", { class: "f6e-info-dim" }, prov.normalisation) : "",
+    );
+  };
+  infoBtn.addEventListener("click", () => { infoPanel.hidden = !infoPanel.hidden; infoBtn.classList.toggle("f6e-on", !infoPanel.hidden); renderInfo(); });
+
   const tile = (value: string | number, label: string, sub: string) =>
     h("div", { class: "f6e-tile" }, h("div", { class: "f6e-tv" }, String(value)), h("div", { class: "f6e-tl" }, label), h("div", { class: "f6e-ts" }, sub));
 
@@ -159,6 +191,7 @@ export function render({ model, el }: { model: AnyModel; el: HTMLElement }): () 
   const ctl = new Controller(new DataSource(dataUrl), figure, {
     onMeta: (m) => {
       meta = m;
+      renderInfo();
       ctSel.replaceChildren(...m.cell_types.map((c) => h("option", { value: c }, c.replaceAll("_", " "))));
       ctSel.value = get("cell_type");
     },
@@ -182,7 +215,7 @@ export function render({ model, el }: { model: AnyModel; el: HTMLElement }): () 
       const patch: Partial<ModelKeys> = {};
       if (p.start !== undefined) patch.start = p.start;
       if (p.end !== undefined) patch.end = p.end;
-      if (p.highlight) patch.highlight = p.highlight;
+      if (p.highlight) { patch.highlight = p.highlight; queueMicrotask(renderInfo); }
       if ("selected_group" in p) patch.selected_group = p.selected_group ?? null;
       if (p.show_gaps !== undefined) patch.show_gaps = p.show_gaps;
       if ("row_px" in p) patch.row_px = p.row_px ?? null;
@@ -219,7 +252,7 @@ export function render({ model, el }: { model: AnyModel; el: HTMLElement }): () 
   resetBtn.addEventListener("click", () => ctl.reset());
   dlCalls.addEventListener("click", () => download(ctl.callsTsv(), `enhancer_calls_${stem()}.tsv`));
   dlGroups.addEventListener("click", () => download(ctl.groupsTsv(), `synteny_groups_${stem()}.tsv`));
-  ctSel.addEventListener("change", () => { set({ cell_type: ctSel.value }); push(); });
+  ctSel.addEventListener("change", () => { set({ cell_type: ctSel.value }); push(); renderInfo(); });
   winSel.addEventListener("change", () => { set({ window_kb: +winSel.value, start: null, end: null }); push(); });
   thr.addEventListener("input", () => { thrV.textContent = (+thr.value).toFixed(1); set({ threshold: +thr.value }); push(); });
   nMaj.addEventListener("change", () => { const v = Math.max(1, Math.min(20, +nMaj.value || 1)); nMaj.value = String(v); set({ n_major: v }); push(); });

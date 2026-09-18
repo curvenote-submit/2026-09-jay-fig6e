@@ -55,6 +55,16 @@ network failures are not cached, so a later hover retries.
 All values are JSON. `save_changes()` is wrapped in try/catch because MyST's
 static host does not implement it.
 
+## Provenance and the Data panel
+
+The ⓘ button in the controls bar opens a panel built from `meta.json`'s
+`provenance` block (written by the pipeline): dataset, citation/DOI, a link to
+the source directory, one download link per **highlighted** species for the
+current cell class (`source_url_template` with `{species}` / `{cell_type}`
+filled in, ≈ 430 MB each), and the store URL with its build date and pipeline
+version. Stores without a `provenance` block fall back to the known Shendure
+URL template.
+
 ## Data layout
 
 ```

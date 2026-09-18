@@ -157,7 +157,35 @@ def _task(args):
     return species, None, info
 
 
+PROVENANCE = {
+    'dataset': 'STEAM-v1 predicted chromatin accessibility, 241 Zoonomia mammals projected onto hg38',
+    'citation': 'Qiu C, Daza RM, Welsh IC, et al. Evolutionary transfer learning enables organism-wide '
+                'inference of mammalian enhancer landscapes.',
+    'source_base': BASE + '/jax_atac_augmented_241_mammals_hg38/hg38/',
+    'source_url_template': HG38_BW_FMT,
+    'source_bytes_per_track': 430_000_000,      # bigwigs are 415-450 MB each
+    'source_format': 'bigWig, per-base predicted accessibility, hg38 coordinates',
+    'normalisation': 'GPS = -10*log10(1 - genome-wide percentile of the raw score), per (species, cell class) '
+                     'quantile curve from norm_ref_species.npz; stored as round(GPS*4) uint8, 255 = no alignment',
+    'binning': '100 bp mean of per-base values on fixed hg38 tiles',
+}
+
+
+def pipeline_version() -> str:
+    try:
+        import subprocess
+        sha = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True,
+                             cwd=Path(__file__).parent).stdout.strip()
+    except Exception:
+        sha = ''
+    return f'steam-zarr 0.1.0{f" ({sha})" if sha else ""}'
+
+
 def write_meta(store_path: Path, grp_attrs: dict, cell_types: Iterable[str]) -> None:
     meta = dict(grp_attrs)
     meta['cell_types'] = sorted(cell_types)
+    prov = dict(PROVENANCE)
+    prov['retrieved'] = time.strftime('%Y-%m-%d')
+    prov['pipeline'] = pipeline_version()
+    meta['provenance'] = {**(meta.get('provenance') or {}), **prov}
     (store_path / 'meta.json').write_text(json.dumps(meta, indent=1))

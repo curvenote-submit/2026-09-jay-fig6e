@@ -10,6 +10,12 @@ export interface StoreMeta {
   chrom_offsets: Record<string, number>;
   species: string[];
   cell_types: string[];
+  /** where the data came from, written by the pipeline (optional in older stores) */
+  provenance?: {
+    dataset?: string; citation?: string; doi?: string; license?: string;
+    source_base?: string; source_url_template?: string; source_bytes_per_track?: number; source_format?: string;
+    normalisation?: string; binning?: string; retrieved?: string; pipeline?: string;
+  };
 }
 
 /** One gene model from genes/<chrom>.json */

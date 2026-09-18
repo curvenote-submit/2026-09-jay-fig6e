@@ -70,3 +70,11 @@
 .f6e-errmeta { margin-top: 4px; color: #991b1b; }
 .f6e-errmeta code { font-size: 11px; background: #fee2e2; padding: 0 4px; word-break: break-all; }
 .f6e-errhint { margin-top: 4px; color: #7f1d1d; }
+.f6e-info { border: 1px solid #e2e8f0; background: #f8fafc; padding: 8px 12px; margin-top: 6px; font-size: 12px; line-height: 1.5; }
+.f6e-info-title { font-weight: 600; }
+.f6e-info-h { margin-top: 6px; font-weight: 600; color: #475569; }
+.f6e-info-dim { color: #64748b; font-size: 11px; }
+.f6e-info a { color: #0d9488; }
+.f6e-info code { font-size: 11px; background: #e2e8f0; padding: 0 4px; word-break: break-all; }
+.f6e-info-list { margin: 2px 0 0; padding-left: 18px; }
+.f6e-iconbtn.f6e-on { background: #e2e8f0; border-color: #94a3b8; }
