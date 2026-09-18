@@ -1,0 +1,4 @@
+numpy<3,>=1.24
+pyBigWig<0.4,>=0.3.22
+zarr<4,>=3
+biopython<2,>=1.81

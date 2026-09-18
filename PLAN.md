@@ -204,9 +204,14 @@ What the spikes taught us (details in `spikes/myst-anywidget/README.md`):
       directive body or `globalThis.F6E_DATA_URL` override it.
 - This is the version to show Jay.
 
-### Phase 2 — whole genome, one cell class (≈1 day near the data, or ~14 h/cell class from a laptop)
+### Phase 2 — whole genome, all cell classes, on AWS (≈1 day) ← ready to run
 
-- Same `build_zarr.py`, all chromosomes, run where the bigwigs live. ~1.8 GB.
+- `pipeline/` (`steam-zarr` CLI + `INFRA.md` + `README.md`): the conversion no longer needs
+  to run near the bigwigs. A faster read path (`values(numpy=True)` + numpy binning, bit-
+  identical to `bw.stats`, 8× faster, 1/50 the CPU) makes the job network-bound: ~3.4 min
+  per track per connection, ~2.2 TB total transfer, **~10–35 h for all 32 cell classes on a
+  c6i.4xlarge with 48 workers, ≈ $20–30**. Resumable per chromosome; syncs each finished
+  cell class to S3. `INFRA.md` has the IAM policy and the text for the infra request.
 - Add sharding (64 chunks/shard) now that there are ~15 k chunks per track.
 - Widget unchanged except the chromosome list stops being a stub.
 - Deploy the MyST site to GitHub Pages.

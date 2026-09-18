@@ -1,0 +1,10 @@
+pyproject.toml
+steam_zarr/__init__.py
+steam_zarr/cli.py
+steam_zarr/core.py
+steam_zarr.egg-info/PKG-INFO
+steam_zarr.egg-info/SOURCES.txt
+steam_zarr.egg-info/dependency_links.txt
+steam_zarr.egg-info/entry_points.txt
+steam_zarr.egg-info/requires.txt
+steam_zarr.egg-info/top_level.txt

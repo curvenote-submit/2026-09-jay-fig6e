@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: steam-zarr
+Version: 0.1.0
+Summary: Convert STEAM-v1 hg38-projected bigwigs into the GPS uint8 Zarr store read by the Fig 6e widget
+Requires-Python: >=3.10
+Requires-Dist: numpy<3,>=1.24
+Requires-Dist: pyBigWig<0.4,>=0.3.22
+Requires-Dist: zarr<4,>=3
+Requires-Dist: biopython<2,>=1.81
