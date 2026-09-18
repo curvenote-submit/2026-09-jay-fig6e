@@ -20,7 +20,7 @@ source .venv/bin/activate
 pip install -q --upgrade pip
 # force a source build of pyBigWig so it links against libcurl (wheels for older
 # Pythons are fine; from-source builds without the headers lose remote support)
-pip install -q --no-binary pyBigWig --force-reinstall --no-deps pyBigWig
+pip install -q --no-cache-dir --no-binary pyBigWig --force-reinstall --no-deps pyBigWig
 pip install -q -e .
 python - <<'PY'
 import numpy, pyBigWig, zarr, Bio, sys
