@@ -55,18 +55,18 @@ steam-zarr bench --workers 48
 
 Reads chr21 for 48 species at once and prints the aggregate rate, the
 per-connection rate, and the projected hours for the whole job at that worker
-count. One connection alone does ~15 Mb of genome per second; if the
+count. One connection alone does ~10–15 Mb of genome per second; if the
 per-connection median has collapsed well below that, the server is throttling
-and you should use fewer workers. If it is holding, try more. Measured from a
-laptop: 8 workers → 75 Mb/s aggregate with no loss per connection; 32 workers →
-188 Mb/s with per-connection halved (likely the laptop's link, not the server —
-the instance will tell).
+and you should use fewer workers. Measured from a c6i.4xlarge in us-east-1
+(2026-09-18): 16 → 113 Mb/s, 48 → 408 Mb/s, 96 → 780 Mb/s aggregate with
+~10 Mb/s per connection throughout, i.e. **≈ 8.5 h for the whole job at
+`--workers 96`**.
 
 ### 2. Build
 
 ```bash
 mkdir -p /data
-nohup steam-zarr build --all --workers 48 \
+nohup steam-zarr build --all --workers 96 \
       --out /data/steam_v1_gps.zarr \
       --upload s3://cn-scms-datastore/csev-steam-1/data/ \
       > /data/build.log 2>&1 &

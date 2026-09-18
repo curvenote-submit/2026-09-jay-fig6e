@@ -63,25 +63,29 @@ window of chr1 in 1.3 s), i.e. 3.4 min per track, ~290 MB transferred per track.
 | **48** | **9 h** | **10–20 h** |
 | 64 | 7 h | 8–20 h |
 
-The unknown is how many concurrent streams `shendure-web` serves before it
-throttles; the CLI's `bench` command measures that in ~5 minutes on the
-instance and prints the projected total, so you pick the worker count from
-data rather than this table. From a laptop, 8 connections scaled perfectly
-(75 Mb/s aggregate, no per-connection loss) and 32 reached 188 Mb/s
-(≈ 18 MB/s) with per-connection rate halved — whether that ceiling is the
-laptop's link or the server, the instance will show. If the server tops out
-near 18 MB/s the whole job takes **~35 h**; provision for 3 days either way.
+**Measured on the instance (c6i.4xlarge, 2026-09-18):** the Shendure server
+keeps serving ~10 Mb/s per connection all the way up:
+
+| Workers | Aggregate | Per connection | Projected total |
+|---|---|---|---|
+| 16 | 113 Mb/s (11 MB/s) | 10.3 Mb/s | 59 h |
+| 48 | 408 Mb/s (38 MB/s) | 10.0 Mb/s | 16 h |
+| **96** | **780 Mb/s (73 MB/s)** | 9.9 Mb/s | **8.5 h** |
+
+So run with `--workers 96` (≈ 12 GB RAM, ~5 cores busy): **all 32 cell classes
+in ≈ 8–10 h, one cell class every ~16 min.** The 35 h laptop-based worst case
+did not materialise.
 
 | Cost item | Estimate |
 |---|---|
-| Compute, c6i.4xlarge on-demand, 20 h (likely) / 35 h (server-capped) | $14 / $24 |
-| Compute, spot | ~$5–8 |
+| Compute, c6i.4xlarge on-demand, ~10 h | $7 |
+| Compute, spot | ~$2–3 |
 | EBS 200 GB gp3, 3 days | $2 |
 | Data transfer in (Shendure → EC2, 2.2 TB) | $0 (inbound is free) |
 | EC2 → S3 upload, same region, 60 GB | $0 |
 | S3 storage, 60 GB, per month | $1.40 |
 | S3 requests + egress serving the widget, per month | < $1 at expected traffic (chunks are ~150 KB; 1 000 page views ≈ 1 GB) |
-| **Total for the conversion** | **≈ $20–30** |
+| **Total for the conversion** | **≈ $10** |
 
 ## IAM policy for the instance role
 
@@ -112,6 +116,34 @@ Manager instead of SSH.
 
 `DeleteObject` is needed so a re-run of a cell class can replace its chunks;
 scope stays inside the prefix.
+
+### Attaching the role to the running instance (2026-09-18 status)
+
+The instance exists — `i-01215d9f9b6020357`, c6i.4xlarge, us-east-1, account
+`166088433508`, Ubuntu — and the software is installed and benchmarked, but it
+has **no IAM role**, so `aws s3` on it reports *Unable to locate credentials*
+and nothing can be uploaded. Whoever has IAM rights in that account runs the
+following once (no restart needed; the role takes effect within a minute):
+
+```bash
+# from a machine with admin credentials for account 166088433508
+cd pipeline
+aws iam create-role --role-name steam-zarr-writer --assume-role-policy-document file://ec2-trust.json
+aws iam put-role-policy --role-name steam-zarr-writer --policy-name csev-steam-1-rw --policy-document file://iam-policy.json
+aws iam attach-role-policy --role-name steam-zarr-writer --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+aws iam create-instance-profile --instance-profile-name steam-zarr-writer
+aws iam add-role-to-instance-profile --instance-profile-name steam-zarr-writer --role-name steam-zarr-writer
+sleep 10   # instance profiles take a few seconds to become usable
+aws ec2 associate-iam-instance-profile --instance-id i-01215d9f9b6020357 \
+    --iam-instance-profile Name=steam-zarr-writer --region us-east-1
+```
+
+Console equivalent: IAM → Roles → Create role (EC2) with the two policies,
+then EC2 → the instance → Actions → Security → **Modify IAM role** → pick it.
+
+Verify on the instance: `aws sts get-caller-identity` shows the role, and
+`aws s3 ls s3://cn-scms-datastore/csev-steam-1/data/` lists the existing
+store.
 
 ### How the instance reaches the bucket
 
@@ -161,11 +193,9 @@ a long-lived secret to delete afterwards.
 1. Connect: `aws ssm start-session --target <instance-id>` (or SSH).
 2. `git clone` this repo (or copy the `pipeline/` folder) and run
    `pipeline/setup.sh` — installs Python deps into a venv (~2 min).
-3. `steam-zarr bench --workers 48` — 5-minute throughput test against the
-   Shendure server; it prints the projected hours for the full job at that
-   worker count. Adjust `--workers` up or down and re-run if the per-connection
-   rate collapsed (throttling) or is still climbing.
-4. `nohup steam-zarr build --all --workers 48 --out /data/steam_v1_gps.zarr
+3. `steam-zarr bench --workers 96` — throughput test against the Shendure
+   server; it prints the projected hours at that worker count (measured: 8.5 h).
+4. `nohup steam-zarr build --all --workers 96 --out /data/steam_v1_gps.zarr
    --upload s3://cn-scms-datastore/csev-steam-1/data/ > build.log 2>&1 &`
    — builds cell class by cell class, syncing each to S3 as it completes, so
    the widget can use finished cell classes while the rest run.
