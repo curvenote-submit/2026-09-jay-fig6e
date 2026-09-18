@@ -11,3 +11,4 @@ data/*.log
 data/genes/
 
 *.zip
+*.egg-info/

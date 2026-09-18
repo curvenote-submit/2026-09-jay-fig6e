@@ -1,2 +1,0 @@
-[console_scripts]
-steam-zarr = steam_zarr.cli:main
