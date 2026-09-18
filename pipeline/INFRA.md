@@ -40,6 +40,17 @@ resumable at chromosome granularity and idempotent, so spot interruption is fine
 Any current-generation x86 family (c7i, m6i, m7i) is equivalent; memory need is
 < 8 GB even at 64 workers.
 
+**EC2 network limits are not a factor.** Instances below `.8xlarge` have a
+*baseline* bandwidth well under their "up to" burst figure (c6i.4xlarge:
+6.25 Gbps baseline, 12.5 burst; c6i.xlarge: 1.56 baseline), but this job
+moves 2.2 TB over 10–35 h — 17–60 MB/s, 0.14–0.5 Gbps, i.e. 2–8 % of the
+c6i.4xlarge baseline and still under a c6i.xlarge's. Per-flow caps (≥ 5 Gbps)
+are irrelevant to connections running at ~1.4 MB/s each, and inbound data from
+the internet is neither metered nor charged. The only throttle that matters is
+the Shendure server's, which `bench` measures. The 4xlarge is recommended for
+worker headroom (64 processes), not bandwidth; a 2xlarge would finish in the
+same time if the server is the limit.
+
 ## Time and cost estimate
 
 Measured single-connection throughput: **0.066 s per Mb of genome** (20 Mb
